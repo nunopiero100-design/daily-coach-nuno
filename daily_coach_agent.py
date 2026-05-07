@@ -31,6 +31,8 @@ import os
 import re
 import statistics
 import sys
+import smtplib
+from email.message import EmailMessage
 from pathlib import Path
 
 import requests
@@ -645,6 +647,49 @@ def build_replacement_event(original, target_date, status, decision_text, reason
     return ev, None
 
 
+
+def smtp_configured():
+    required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "TO_EMAIL"]
+    return all(os.getenv(k, "").strip() for k in required)
+
+
+def send_email_report(subject, body, attachment_paths=None):
+    if not smtp_configured():
+        return False, "SMTP não configurado; e-mail não enviado."
+
+    host = os.getenv("SMTP_HOST", "").strip()
+    port = int(os.getenv("SMTP_PORT", "587").strip())
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "").strip()
+    to_email = os.getenv("TO_EMAIL", "").strip()
+    from_email = os.getenv("FROM_EMAIL", user).strip() or user
+
+    msg = EmailMessage()
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.set_content(body)
+
+    for p in attachment_paths or []:
+        path = Path(p)
+        if not path.exists():
+            continue
+        data = path.read_bytes()
+        msg.add_attachment(
+            data,
+            maintype="application",
+            subtype="octet-stream",
+            filename=path.name,
+        )
+
+    with smtplib.SMTP(host, port, timeout=45) as smtp:
+        smtp.starttls()
+        smtp.login(user, password)
+        smtp.send_message(msg)
+
+    return True, f"E-mail enviado para {to_email}."
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", default=None)
@@ -653,6 +698,7 @@ def main():
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--email", action="store_true", help="Enviar relatório por e-mail se SMTP estiver configurado.")
     args = parser.parse_args()
 
     intervals_key = os.getenv("INTERVALS_API_KEY", "").strip()
@@ -876,6 +922,20 @@ def main():
             "activities": activities[:50],
             "events": events,
         }, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+
+    email_status = None
+    if args.email:
+        subject_status = decision.get("status") or "n/d"
+        subject = f"Daily Coach — {subject_status} — {target.isoformat()}"
+        ok, msg = send_email_report(
+            subject=subject,
+            body=report,
+            attachment_paths=["daily_agent_report.json"],
+        )
+        email_status = msg
+        report += "\nEMAIL\n"
+        report += f"- {msg}\n"
+        Path("daily_agent_report.txt").write_text(report, encoding="utf-8")
 
     print(report)
 
