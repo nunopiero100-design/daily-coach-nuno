@@ -98,3 +98,27 @@ Para aplicar:
 1. Substitui `daily_coach_agent.py`
 2. Faz commit
 3. Corre `Actions → Daily Coach Agent → Run workflow`
+
+
+## Update v3 — Envio diário por e-mail
+
+Esta versão envia o relatório por e-mail no fim do workflow.
+
+Adicionar estes secrets no GitHub:
+
+- `SMTP_HOST` = `smtp.gmail.com`
+- `SMTP_PORT` = `587`
+- `SMTP_USER` = o teu e-mail Gmail
+- `SMTP_PASSWORD` = app password do Gmail
+- `TO_EMAIL` = e-mail onde queres receber o relatório
+- `FROM_EMAIL` = opcional; pode ser igual ao SMTP_USER
+
+Com Gmail, usa uma App Password, não a password normal da conta.
+
+O workflow já corre com:
+
+```bash
+python daily_coach_agent.py $EXTRA_ARGS --debug --email
+```
+
+Se SMTP não estiver configurado, o workflow continua a correr e apenas não envia e-mail.
