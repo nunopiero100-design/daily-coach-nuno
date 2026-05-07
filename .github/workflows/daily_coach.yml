@@ -44,6 +44,12 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
           AUTO_APPLY: ${{ secrets.AUTO_APPLY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |
           EXTRA_ARGS="--auto"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.apply }}" = "true" ]; then
@@ -52,7 +58,7 @@ jobs:
           if [ -n "${{ inputs.target_date }}" ]; then
             EXTRA_ARGS="$EXTRA_ARGS --date ${{ inputs.target_date }}"
           fi
-          python daily_coach_agent.py $EXTRA_ARGS --debug
+          python daily_coach_agent.py $EXTRA_ARGS --debug --email
 
       - name: Upload reports
         uses: actions/upload-artifact@v4
