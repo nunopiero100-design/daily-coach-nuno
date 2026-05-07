@@ -1,0 +1,72 @@
+name: Weekly Planner Agent
+
+on:
+  schedule:
+    # Segunda-feira 08:15 Portugal no horário de verão = 07:15 UTC.
+    # No inverno, para 08:15 local, muda para "15 8 * * 1".
+    - cron: "15 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply/update week workouts in Intervals?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      target_week_start:
+        description: "Optional Monday YYYY-MM-DD"
+        required: false
+        default: ""
+
+jobs:
+  weekly-planner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run Weekly Planner
+        env:
+          INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+          ATHLETE_ID: ${{ secrets.ATHLETE_ID }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          WEEKLY_AUTO_APPLY: ${{ secrets.WEEKLY_AUTO_APPLY }}
+          PLAN_START_DATE: ${{ secrets.PLAN_START_DATE }}
+          PLAN_ID: ${{ secrets.PLAN_ID }}
+        run: |
+          EXTRA_ARGS="--auto"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.apply }}" = "true" ]; then
+            EXTRA_ARGS="--apply"
+          fi
+          if [ -n "${{ inputs.target_week_start }}" ]; then
+            EXTRA_ARGS="$EXTRA_ARGS --target-week-start ${{ inputs.target_week_start }}"
+          fi
+          python weekly_planner_agent.py $EXTRA_ARGS --email --debug
+
+      - name: Upload weekly planner reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-planner-report
+          path: |
+            weekly_planner_report.txt
+            weekly_planner_report.json
+            weekly_planner_payload.json
+            weekly_debug_raw.json
+          if-no-files-found: ignore
