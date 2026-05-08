@@ -2,9 +2,9 @@ name: Schedule Test
 
 on:
   schedule:
-    # 13:45 UTC = 14:45 em Lisboa (Horário de Verão)
-    # Removida a linha timezone que causava erro
-    - cron: "45 13 * * *"
+    # Vamos forçar um minuto específico para o "acordar"
+    # Agora são 13:34 UTC. Vamos marcar para as 13:40 UTC (14:40 Lisboa)
+    - cron: "40 13 * * *"
   workflow_dispatch:
 
 jobs:
@@ -13,6 +13,6 @@ jobs:
     steps:
       - name: Print time
         run: |
-          echo "Schedule test running"
-          date -u
-          echo "Event: ${{ github.event_name }}"
+          echo "Teste de agendamento a correr..."
+          date
+          echo "Evento: ${{ github.event_name }}"
