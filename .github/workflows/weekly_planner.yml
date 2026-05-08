@@ -4,7 +4,7 @@ on:
   schedule:
     # Segunda-feira 08:15 Portugal no horário de verão = 07:15 UTC.
     # No inverno, para 08:15 local, muda para "15 8 * * 1".
-    - cron: "15 7 * * 1"
+    - cron: "20 7 * * 1"
   workflow_dispatch:
     inputs:
       apply:
