@@ -116,6 +116,20 @@ def rhr(w):
     return fnum(first(w, ["restingHR", "resting_hr", "restingHeartRate", "rhr"]))
 
 
+def weight_kg(w):
+    """Best-effort weight extraction from Intervals wellness/Garmin sync."""
+    v = fnum(first(w, [
+        "weight", "weightKg", "weight_kg", "bodyWeight", "body_weight",
+        "mass", "icu_weight", "Weight"
+    ]))
+    if v is None:
+        return None
+    # If some API ever returns grams, normalize defensively.
+    if v > 300:
+        return v / 1000
+    return v
+
+
 def ctl(w):
     return fnum(first(w, ["ctl", "fitness", "icu_ctl", "icu_fitness"]))
 
@@ -152,6 +166,61 @@ def hours(item):
 def mean(vals):
     vals = [v for v in vals if v is not None]
     return statistics.mean(vals) if vals else None
+
+
+def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
+    """Simple coaching guidance for weight loss without compromising training."""
+    target_weight = 74.0
+    planned = context.get("planned_events_today", [])
+    planned_load = sum((e.get("load") or 0) for e in planned)
+    planned_hours = sum((e.get("hours") or 0) for e in planned)
+    names = " ".join(str(e.get("name") or "") for e in planned).lower()
+
+    intense_terms = [
+        "sweet spot", "threshold", "vo2", "zone 5", "zone 6", "over", "under",
+        "tempo", "interval", "burst", "sprint", "test", "race"
+    ]
+    is_quality = planned_load >= 65 or any(t in names for t in intense_terms)
+    is_long = planned_hours >= 2.0 or planned_load >= 100
+    is_rest_or_easy = planned_load <= 35 and not is_quality
+
+    ref_weight = weight_avg_7d if weight_avg_7d is not None else weight_today
+    delta = (ref_weight - target_weight) if ref_weight is not None else None
+
+    lines = []
+    if weight_today is not None:
+        lines.append(f"Peso hoje: {fmt(weight_today,1)} kg.")
+    else:
+        lines.append("Peso hoje: n/d.")
+    if weight_avg_7d is not None:
+        lines.append(f"Média 7d: {fmt(weight_avg_7d,1)} kg.")
+    else:
+        lines.append("Média 7d: n/d.")
+    if delta is not None:
+        if delta > 0:
+            lines.append(f"Objetivo 74 kg: faltam ~{fmt(delta,1)} kg; apontar para 0,25–0,40 kg/semana.")
+        else:
+            lines.append("Objetivo 74 kg: já estás na zona-alvo; proteger potência e recuperação.")
+    else:
+        lines.append("Objetivo 74 kg: usar média semanal, não o peso de um único dia.")
+
+    lines.append("Proteína: 150–170 g/dia.")
+
+    if is_quality:
+        lines.append("Hoje há qualidade/intensidade: não fazer défice agressivo; alimentar bem antes e depois.")
+        if planned_hours >= 1.0:
+            lines.append("Durante o treino: 60–80 g hidratos/h se a sessão passar de ~75 min ou tiver blocos duros.")
+        lines.append("Pós-treino: 30–40 g proteína + hidratos suficientes para recuperar.")
+    elif is_long:
+        lines.append("Treino longo/endurance: 40–70 g hidratos/h conforme intensidade; não acabar vazio.")
+        lines.append("Défice leve apenas se a recuperação estiver boa.")
+    elif is_rest_or_easy:
+        lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
+    else:
+        lines.append("Dia moderado: défice leve, sem cortar demasiado os hidratos pré/pós treino.")
+
+    lines.append("Se HRV/sono piorarem ou a potência cair, não apertar dieta: primeiro recuperar.")
+    return lines
 
 
 def fmt(v, digits=1):
@@ -284,22 +353,59 @@ def compliance_check(planned_events, done_activities):
     done_load = sum((load(a) or 0.0) for a in done_activities)
     done_hours = sum((hours(a) or 0.0) for a in done_activities)
 
+    # Infer the date for contextual rules. This is mainly used to interpret
+    # Saturday/Sunday substitutions correctly.
+    dates = [parse_item_date(x) for x in list(planned_events) + list(done_activities)]
+    dates = [d for d in dates if d is not None]
+    target_date = dates[0] if dates else None
+    is_weekend = target_date.weekday() >= 5 if target_date else False
+
+    done_density = (done_load / done_hours) if done_hours and done_hours > 0 else 0
+    planned_density = (planned_load / planned_hours) if planned_hours and planned_hours > 0 else 0
+    ratio = done_load / planned_load if planned_load > 10 else 1.0
+
+    interpretation = ""
+    no_compensation = False
+    substitution_valid = False
+
     if planned_events and done_activities:
-        ratio = done_load / planned_load if planned_load > 10 else 1.0
-        if ratio > 1.25:
+        # Weekend practical logic:
+        # - Saturday for Nuno is usually max 2h; 75-90min indoor can be a valid shorter version.
+        # - Sunday is social/free; 90min indoor quality is a valid substitute if outdoor/social fails.
+        # Do not classify these as simple failure.
+        if is_weekend and planned_hours >= 1.75 and 1.0 <= done_hours <= 2.25 and done_load >= 45 and ratio >= 0.45:
+            substitution_valid = True
+            no_compensation = True
+            if planned_hours >= 2.5:
+                status = "SUBSTITUIÇÃO INDOOR/VERSÃO CURTA VÁLIDA"
+                interpretation = "Fim de semana: volume abaixo do planeado, mas houve estímulo válido. Não compensar volume perdido à força."
+            else:
+                status = "VERSÃO CURTA CUMPRIDA"
+                interpretation = "Sábado/treino curto: estímulo principal provavelmente cumprido numa versão mais curta. Não compensar no dia seguinte."
+        elif ratio > 1.25:
             status = "FEITO MAS MAIS DURO"
+            interpretation = "Carga acima do planeado. Observar readiness antes de manter intensidade nos dias seguintes."
         elif ratio >= 0.85:
             status = "CUMPRIDO"
+            interpretation = "Treino cumprido dentro de margem normal."
         elif ratio >= 0.55:
             status = "PARCIAL / MAIS LEVE"
+            interpretation = "Treino parcial/mais leve. Não compensar automaticamente; decidir pelo estado de hoje."
+            no_compensation = True
         else:
             status = "MUITO ABAIXO DO PLANO"
+            interpretation = "Muito abaixo do plano. Não transformar em dívida; reavaliar pelo readiness."
+            no_compensation = True
     elif planned_events and not done_activities:
-        status = "PLANEADO MAS NÃO DETETADO"
+        status = "PLANEADO MAS NÃO REALIZADO"
+        interpretation = "Treino planeado não realizado. Treino perdido não vira dívida; não compensar automaticamente no dia seguinte."
+        no_compensation = True
     elif not planned_events and done_activities:
         status = "EXTRA / NÃO PLANEADO"
+        interpretation = "Atividade extra. Considerar carga real antes de intensificar."
     else:
         status = "DESCANSO CUMPRIDO / SEM TREINO"
+        interpretation = "Dia sem treino cumprido."
 
     return {
         "status": status,
@@ -309,6 +415,14 @@ def compliance_check(planned_events, done_activities):
         "done_hours": done_hours,
         "planned_count": len(planned_events),
         "done_count": len(done_activities),
+        "done_density": done_density,
+        "planned_density": planned_density,
+        "ratio": ratio,
+        "target_date": target_date.isoformat() if target_date else None,
+        "is_weekend": is_weekend,
+        "substitution_valid": substitution_valid,
+        "no_compensation": no_compensation,
+        "interpretation": interpretation,
     }
 
 
@@ -483,8 +597,10 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
         reasons.append(
             f"Ontem foi mais duro que o planeado: feito {fmt(yesterday_compliance.get('done_load'),0)} vs planeado {fmt(yesterday_compliance.get('planned_load'),0)} TSS."
         )
-    elif y_status == "PLANEADO MAS NÃO DETETADO":
-        reasons.append("Ontem havia treino planeado, mas não detetei atividade. Não vou assumir compensação automática.")
+    elif y_status in ("SUBSTITUIÇÃO INDOOR/VERSÃO CURTA VÁLIDA", "VERSÃO CURTA CUMPRIDA"):
+        reasons.append("Ontem houve substituição/versão curta válida. Não compensar volume perdido; decidir apenas pelo estado de hoje.")
+    elif y_status == "PLANEADO MAS NÃO REALIZADO":
+        reasons.append("Ontem havia treino planeado, mas não foi realizado. Treino perdido não vira dívida; não compensar automaticamente.")
     elif y_status in ("PARCIAL / MAIS LEVE", "MUITO ABAIXO DO PLANO"):
         reasons.append(f"Ontem ficou abaixo do planeado ({y_status}). Não compensar à força; ajustar pelo estado de hoje.")
 
@@ -534,6 +650,7 @@ Perfil do atleta:
 
 Princípios de decisão:
 - Preservar consistência, recuperação e adaptação é mais importante do que forçar treino num dia aparentemente bom.
+- Peso/fueling: objetivo 74 kg, mas sem comprometer potência, sono, HRV ou recuperação. Em dias intensos não sugerir défice agressivo.
 - Não transformar um dia sem treino planeado num treino de qualidade só porque sono, HRV ou Form estão bons.
 - Form positiva significa que o atleta está fresco; não significa automaticamente que deve fazer intensidade.
 - Nunca recomendar compensar um treino falhado aumentando intensidade no dia seguinte.
@@ -568,6 +685,24 @@ Regras específicas:
    - Não recomendar repetir treino.
    - Recomendação deve focar recuperação, hidratação e nutrição pós-treino.
 
+8. Regra automática de fim de semana:
+   - Se calendar_context.is_weekend for true, inclui SEMPRE uma alternativa indoor/rolo de 90 minutos.
+   - Esta alternativa deve servir para chuva, mau tempo, falta de grupo ou impossibilidade de sair.
+   - A alternativa indoor de 90 minutos deve respeitar o estado do dia:
+     VERDE: treino estruturado indoor equivalente mas controlado.
+     AMARELO: versão indoor reduzida, mais Z2 e menos intensidade.
+     VERMELHO: recovery/Z2 indoor ou descanso.
+   - Não obrigar o atleta a preencher available_minutes, training_location ou notes para ter esta alternativa.
+   - Se o treino original for domingo social/grupo, a alternativa indoor deve ser clara e executável em 90 minutos.
+
+9. Treinos falhados e substituições válidas:
+   - Se ontem teve treino planeado mas não foi realizado, NÃO tratar como dívida.
+   - Não recomendar compensar o treino perdido no dia seguinte.
+   - Se yesterday.compliance.status indicar SUBSTITUIÇÃO INDOOR/VERSÃO CURTA VÁLIDA ou VERSÃO CURTA CUMPRIDA, aceitar como estímulo válido.
+   - Sábado do Nuno é normalmente até 2h; uma versão indoor de 75-90 min pode ser cumprimento válido.
+   - Domingo é social/livre; se não der para sair e houver 90 min indoor com carga razoável, considerar substituição válida.
+   - Em todos estes casos, a decisão de hoje deve depender de readiness e do treino de hoje, não de “pagar” volume perdido.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -581,9 +716,12 @@ REASONS:
 - motivo 2
 - motivo 3
 ACTIONS:
-- ação 1
-- ação 2
-- ação 3
+- Plano normal: ação principal
+- Se só tiveres 60 min: versão reduzida
+- Se só tiveres 45 min: versão muito reduzida ou Z2
+- Se for indoor/rolo: versão indoor estruturada
+- Se for sábado/domingo e não der para sair: alternativa indoor/rolo de 90 minutos
+- Recuperação/fueling: nota curta
 SHOULD_MODIFY_INTERVALS: true ou false
 
 Definições:
@@ -907,10 +1045,12 @@ def main():
 
     today_w = by_day.get(target, {})
     prev14 = [by_day[d] for d in [target - dt.timedelta(days=i) for i in range(1, 15)] if d in by_day]
+    prev7 = [by_day[d] for d in [target - dt.timedelta(days=i) for i in range(1, 8)] if d in by_day]
     baseline = {
         "hrv": mean([hrv(w) for w in prev14]),
         "rhr": mean([rhr(w) for w in prev14]),
         "sleep": mean([sleep_h(w) for w in prev14]),
+        "weight_7d": mean([weight_kg(w) for w in prev7]),
     }
 
     recent_load = 0.0
@@ -938,6 +1078,7 @@ def main():
             "sleep_score": sleep_score(today_w),
             "hrv": hrv(today_w),
             "resting_hr": rhr(today_w),
+            "weight_kg": weight_kg(today_w),
             "fitness_ctl": ctl(today_w),
             "fatigue_atl": atl(today_w),
             "form": form(today_w),
@@ -973,9 +1114,52 @@ def main():
         },
     }
 
+    context["calendar_context"] = {
+        "weekday": target.strftime("%A"),
+        "weekday_number": target.weekday(),
+        "is_weekend": target.weekday() >= 5,
+        "weekend_indoor_alternative_required": target.weekday() >= 5,
+    }
+
+    required_today_metrics = {
+        "sleep_hours": context["today_metrics"].get("sleep_hours"),
+        "hrv": context["today_metrics"].get("hrv"),
+        "resting_hr": context["today_metrics"].get("resting_hr"),
+    }
+    missing_today_metrics = [k for k, v in required_today_metrics.items() if v is None]
+    context["data_quality"] = {
+        "required_today_metrics": required_today_metrics,
+        "missing_today_metrics": missing_today_metrics,
+        "is_complete": len(missing_today_metrics) == 0,
+    }
+
+    context["fueling_guidance"] = fueling_guidance(
+        context,
+        weight_today=context["today_metrics"].get("weight_kg"),
+        weight_avg_7d=context["baseline_14d"].get("weight_7d"),
+    )
+
     heuristic = heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance)
 
-    if done_today:
+    if missing_today_metrics:
+        decision = {
+            "status": "DADOS INCOMPLETOS",
+            "decision_text": "Dados incompletos: atualiza/sincroniza os dados no Intervals e corre manualmente o Daily Coach.",
+            "reasons": [
+                "Faltam métricas essenciais de hoje: " + ", ".join(missing_today_metrics) + ".",
+                "Prefiro não dar uma recomendação de treino baseada em dados incompletos.",
+                "Depois de Garmin/Intervals sincronizarem sono, HRV e resting HR, corre o workflow manualmente."
+            ],
+            "actions": [
+                "Abrir Garmin/Intervals e confirmar sincronização dos dados de hoje.",
+                "Correr manualmente o Daily Coach Agent depois da sincronização.",
+                "Até lá: não alterar treino automaticamente; se precisares sair já, escolhe a opção mais conservadora."
+            ],
+            "should_modify_intervals": False,
+            "source": "data_quality_guard",
+        }
+        ai_error = None
+    elif done_today:
         done_today_load = sum((load(a) or 0.0) for a in done_today)
         done_today_hours = sum((hours(a) or 0.0) for a in done_today)
         decision = {
@@ -995,6 +1179,22 @@ def main():
         decision = ai_decision or heuristic
         if ai_error:
             decision.setdefault("reasons", []).append(ai_error)
+
+    # Automatic practical weekend alternative even if the model forgets it.
+    try:
+        cal = context.get("calendar_context", {})
+        if cal.get("weekend_indoor_alternative_required"):
+            actions = decision.setdefault("actions", [])
+            has_weekend_indoor = any(("90" in str(a) and ("indoor" in str(a).lower() or "rolo" in str(a).lower())) for a in actions)
+            if not has_weekend_indoor:
+                if decision.get("status") == "VERMELHO":
+                    actions.append("Se for sábado/domingo e não der para sair: 45–60 min rolo muito fácil em Z1/Z2 ou descanso total; não fazer intensidade.")
+                elif decision.get("status") == "AMARELO":
+                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor com 60–70 min Z2 fácil + 2x8 min tempo leve se as pernas responderem bem; sem forçar.")
+                else:
+                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor/rolo — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar em Z2, 10 min arrefecer.")
+    except Exception:
+        pass
 
     applied = False
     apply_error = None
@@ -1021,6 +1221,8 @@ def main():
             apply_error = "AUTO_APPLY desligado, --dry-run ativo ou execução sem permissão de apply."
     elif decision.get("status") == "JÁ FEITO":
         apply_error = "já existe atividade feita hoje; nada alterado."
+    elif decision.get("status") == "DADOS INCOMPLETOS":
+        apply_error = "dados de hoje incompletos; nada alterado."
 
     lines = []
     lines.append("=" * 72)
@@ -1048,6 +1250,8 @@ def main():
     lines.append(f"Estado: {yc['status']}")
     lines.append(f"Planeado: {fmt(yc['planned_load'],0)} TSS | {fmt_h(yc['planned_hours'])}")
     lines.append(f"Realizado: {fmt(yc['done_load'],0)} TSS | {fmt_h(yc['done_hours'])}")
+    if yc.get("interpretation"):
+        lines.append(f"Leitura: {yc.get('interpretation')}")
     lines.append("")
     tm = context["today_metrics"]
     bl = context["baseline_14d"]
@@ -1055,8 +1259,17 @@ def main():
     lines.append(f"- Sono: {fmt_h(tm.get('sleep_hours'))} | score: {fmt(tm.get('sleep_score'),0)}")
     lines.append(f"- HRV: {fmt(tm.get('hrv'))} | baseline 14d: {fmt(bl.get('hrv'))}")
     lines.append(f"- Resting HR: {fmt(tm.get('resting_hr'),0)} bpm | baseline 14d: {fmt(bl.get('rhr'),0)} bpm")
+    lines.append(f"- Peso: {fmt(tm.get('weight_kg'),1)} kg | média 7d: {fmt(bl.get('weight_7d'),1)} kg | objetivo: 74,0 kg")
     lines.append(f"- Fitness/CTL: {fmt(tm.get('fitness_ctl'),0)} | Fatigue/ATL: {fmt(tm.get('fatigue_atl'),0)} | Form: {fmt(tm.get('form'),0)}")
     lines.append(f"- Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
+    dq = context.get("data_quality", {})
+    if not dq.get("is_complete", True):
+        lines.append(f"- Qualidade dos dados: INCOMPLETA — faltam {', '.join(dq.get('missing_today_metrics', []))}")
+    else:
+        lines.append("- Qualidade dos dados: completa")
+    lines.append("")
+    lines.append("PESO / FUELING")
+    lines += [f"- {x}" for x in context.get("fueling_guidance", [])]
     lines.append("")
     lines.append("DECISÃO")
     lines.append(f"Estado: {decision.get('status')}")

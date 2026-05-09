@@ -393,11 +393,59 @@ def recovery_override(macro_week):
     return {
         1: ("AJUSTADO S%02d Ter — Recovery 60min" % macro_week, "Semana ajustada para recuperação.", z2(60,58)),
         2: ("AJUSTADO S%02d Qua — Z2 fácil 75min" % macro_week, "Z2 fácil.", z2(75,60)),
-        3: ("AJUSTADO S%02d Qui — Z2 60min + 3x1min" % macro_week, "Ativar sem stress.", [wu(600,45,60), ss(900,60), itv(3,60,95,180,55), ss(900,60), cd(600,55,35)]),
+        3: ("AJUSTADO S%02d Qui — Z2 60min + 3x1min" % macro_week, "Ativar sem stress.", [wu(600,45,60), ss(900,60), itv(3,60,95,180,55), ss(780,60), cd(600,55,35)]),
         5: ("AJUSTADO S%02d Sáb — Endurance 90min fácil" % macro_week, "Sem intensidade.", z2(90,60)),
         6: ("AJUSTADO S%02d Dom — Social/endurance 150 TSS" % macro_week, "Domingo social placeholder.", sunday_150()),
     }
 
+
+def event_text(e):
+    return " ".join(str(e.get(k, "")) for k in ("name", "description", "category", "type", "sub_type")).upper()
+
+
+def is_no_bike_event(e):
+    txt = event_text(e)
+    keywords = [
+        "NO BIKE WEEK", "NO BIKE", "SEM BIKE", "SEM BICICLETA",
+        "FERIAS SEM BIKE", "FÉRIAS SEM BIKE", "VIAGEM SEM BIKE",
+        "VACATION NO BIKE"
+    ]
+    return any(k in txt for k in keywords)
+
+
+def has_no_bike_week(events, start, end):
+    for e in events:
+        d = parse_item_date(e)
+        if d and start <= d <= end and is_no_bike_event(e):
+            return True, e
+        # Some multi-day holiday events may expose end_date/end_date_local. Handle overlap conservatively.
+        sd = None
+        ed = None
+        for key in ("start_date_local", "start_date", "date", "day"):
+            if e.get(key):
+                try:
+                    sd = dt.date.fromisoformat(str(e.get(key))[:10]); break
+                except Exception:
+                    pass
+        for key in ("end_date_local", "end_date"):
+            if e.get(key):
+                try:
+                    ed = dt.date.fromisoformat(str(e.get(key))[:10]); break
+                except Exception:
+                    pass
+        if sd and ed and not (ed < start or sd > end) and is_no_bike_event(e):
+            return True, e
+    return False, None
+
+
+def reentry_week(macro_week):
+    return {
+        1: ("REENTRY S%02d Ter — Z2 75min + openers" % macro_week, "Regresso pós NO BIKE WEEK. Sem compensar carga perdida.", [wu(600,45,62), ss(1200,62), itv(3,60,95,180,55), ss(900,62), cd(600,55,35)]),
+        2: ("REENTRY S%02d Qua — Z2 real 90min HR≤128" % macro_week, "Z2 verdadeiro para voltar ao ritmo.", z2(90,62)),
+        3: ("REENTRY S%02d Qui — Sweet Spot curto 2x10 @88%%" % macro_week, "Toque controlado; se RPE alto, transformar em Z2.", [wu(720,45,68), ss(300,62), itv(2,600,88,300,55), ss(900,62), cd(600,58,36)]),
+        5: ("REENTRY S%02d Sáb — Endurance 90min fácil" % macro_week, "Sábado conservador pós-férias.", z2(90,62)),
+        6: ("REENTRY S%02d Dom — Social/endurance controlado" % macro_week, "Domingo livre, mas evitar pancadaria se a semana de regresso pesar.", sunday_150()),
+    }
 
 def summarize_prior_week(events, activities, week_start):
     start = week_start - dt.timedelta(days=7)
@@ -567,7 +615,9 @@ def decide_adjustment(macro_week, prior, latest_w):
 
 
 def build_events(week_start, macro_week, adjustment, plan_id):
-    lib = recovery_override(macro_week) if adjustment == "recovery" else base_week(macro_week)
+    if adjustment == "no_bike":
+        return []
+    lib = recovery_override(macro_week) if adjustment == "recovery" else (reentry_week(macro_week) if adjustment == "reentry" else base_week(macro_week))
     dates = {1: week_start+dt.timedelta(days=1), 2: week_start+dt.timedelta(days=2), 3: week_start+dt.timedelta(days=3), 5: week_start+dt.timedelta(days=5), 6: week_start+dt.timedelta(days=6)}
     times = {1: dt.time(11,30), 2: dt.time(11,30), 3: dt.time(11,30), 5: dt.time(8,0), 6: dt.time(8,0)}
     events = []
@@ -677,8 +727,18 @@ def main():
     latest_day = max(real_wellness_days) if real_wellness_days else None
     latest_w = by_day.get(latest_day, {}) if latest_day else {}
 
+    no_bike_current, no_bike_event = has_no_bike_week(events, week_start, week_start + dt.timedelta(days=6))
+    no_bike_previous, previous_no_bike_event = has_no_bike_week(events, week_start - dt.timedelta(days=7), week_start - dt.timedelta(days=1))
+
     prior = summarize_prior_week(events, activities, week_start)
-    adjustment, reasons = decide_adjustment(macro_week, prior, latest_w)
+    if no_bike_current:
+        adjustment = "no_bike"
+        reasons = ["NO BIKE WEEK detetada no Intervals. Não criar treinos de bicicleta; não compensar carga perdida."]
+    elif no_bike_previous:
+        adjustment = "reentry"
+        reasons = ["Semana anterior marcada como NO BIKE WEEK. Criar semana de reentrada progressiva, sem VO2 pesado logo de início."]
+    else:
+        adjustment, reasons = decide_adjustment(macro_week, prior, latest_w)
     week_events = build_events(week_start, macro_week, adjustment, plan_id)
 
     total_load = sum(e["load"] for e in week_events)
@@ -688,9 +748,12 @@ def main():
     applied = False
     apply_msg = "Não aplicado."
     if allow_apply:
-        client.upload_bulk_events(week_events)
-        applied = True
-        apply_msg = f"{len(week_events)} treinos criados/atualizados no Intervals."
+        if week_events:
+            client.upload_bulk_events(week_events)
+            applied = True
+            apply_msg = f"{len(week_events)} treinos criados/atualizados no Intervals."
+        else:
+            apply_msg = "NO BIKE WEEK: não há treinos de bicicleta para criar/atualizar."
     elif args.dry_run:
         apply_msg = "Dry-run ativo; nada aplicado."
     elif args.auto and not weekly_auto:
@@ -702,6 +765,10 @@ def main():
     lines.append("="*72)
     lines.append(f"Atleta: {athlete.get('name') or athlete.get('id') or 'n/d'}")
     lines.append(f"Ajuste semanal: {adjustment}")
+    if adjustment == "no_bike":
+        lines.append("Modo especial: NO BIKE WEEK / férias sem bicicleta.")
+    elif adjustment == "reentry":
+        lines.append("Modo especial: reentrada progressiva após NO BIKE WEEK.")
     if macro_week <= 0:
         lines.append("Nota: esta é uma semana anterior ao PLAN_START_DATE. Para testar a semana 1, usa target_week_start=2026-05-11.")
     lines.append("")
@@ -721,6 +788,10 @@ def main():
     lines.append("")
     lines.append("PLANO DA SEMANA")
     lines.append(f"Total estimado: {fmt(total_load,0)} TSS | {fmt_h(total_hours)}")
+    if not week_events and adjustment == "no_bike":
+        lines.append("- Sem treinos de ciclismo criados esta semana.")
+        lines.append("- Manutenção sugerida: caminhadas, mobilidade e core leve 2-3x, sem tentar simular VO2/threshold fora da bicicleta.")
+        lines.append("- Regresso: semana seguinte deve ser progressiva, sem compensar carga perdida.")
     for e in week_events:
         lines.append(f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)}")
     lines.append("")
