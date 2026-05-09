@@ -4,7 +4,7 @@ on:
   schedule:
     # Portugal in summer time (WEST, UTC+1): 07:05 local = 06:05 UTC.
     # In winter this will run at 06:05 local unless you adjust to 07:05 UTC.
-    - cron: "37 6 * * *"
+    - cron: "20 7 * * *"
   workflow_dispatch:
     inputs:
       apply:
