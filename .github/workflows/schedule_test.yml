@@ -4,7 +4,7 @@ on:
   schedule:
     # Vamos forçar um minuto específico para o "acordar"
     # Agora são 13:34 UTC. Vamos marcar para as 13:40 UTC (14:40 Lisboa)
-    - cron: "40 13 * * *"
+    - cron: "51 12 * * *"
   workflow_dispatch:
 
 jobs:
