@@ -1,6 +1,10 @@
 name: Weekly Planner Agent
 
 on:
+  schedule:
+    # Segunda-feira 08:40 Portugal no horário de verão = 07:40 UTC.
+    # No inverno, para manter 08:40 Portugal, muda para "40 8 * * 1".
+    - cron: "40 7 * * 1"
   workflow_dispatch:
     inputs:
       apply:
