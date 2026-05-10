@@ -1339,22 +1339,6 @@ def main():
 
     decision = normalize_practical_actions(decision, context)
 
-    # Automatic practical weekend alternative even if the model forgets it.
-    try:
-        cal = context.get("calendar_context", {})
-        if cal.get("weekend_indoor_alternative_required") and decision.get("status") not in ("JÁ FEITO", "DADOS INCOMPLETOS"):
-            actions = decision.setdefault("actions", [])
-            has_weekend_indoor = any(("90" in str(a) and ("indoor" in str(a).lower() or "rolo" in str(a).lower())) for a in actions)
-            if not has_weekend_indoor:
-                if decision.get("status") == "VERMELHO":
-                    actions.append("Se for sábado/domingo e não der para sair: 45–60 min rolo muito fácil em Z1/Z2 ou descanso total; não fazer intensidade.")
-                elif decision.get("status") == "AMARELO":
-                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor com 60–70 min Z2 fácil + 2x8 min tempo leve se as pernas responderem bem; sem forçar.")
-                else:
-                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer.")
-    except Exception:
-        pass
-
     applied = False
     apply_error = None
 
