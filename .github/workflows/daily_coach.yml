@@ -1,10 +1,6 @@
 name: Daily Coach Agent
 
 on:
-  schedule:
-    # 08:20 Portugal no horário de verão = 07:20 UTC.
-    # No inverno, para manter 08:20 Portugal, muda para "20 8 * * *".
-    - cron: "19 3 * * *"
   workflow_dispatch:
     inputs:
       apply:
