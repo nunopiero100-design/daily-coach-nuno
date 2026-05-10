@@ -909,13 +909,26 @@ def normalize_practical_actions(decision, context):
             weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
 
     def replaceable(action):
-        s = str(action).lower()
-        return (
-            s.startswith("se só tiveres 60") or s.startswith("se so tiveres 60") or
-            s.startswith("se só tiveres 45") or s.startswith("se so tiveres 45") or
-            s.startswith("se for indoor") or
-            s.startswith("se for sábado/domingo") or s.startswith("se for sabado/domingo")
-        )
+        s = str(action).lower().strip()
+
+        practical_markers = [
+            "se só tiveres 60", "se so tiveres 60", "if só tiveres 60", "if so tiveres 60",
+            "se só tiveres 45", "se so tiveres 45", "if só tiveres 45", "if so tiveres 45",
+            "se tiveres 60", "se tiveres 45",
+            "se for indoor", "if for indoor",
+            "se for sábado/domingo", "se for sabado/domingo",
+            "if for sábado/domingo", "if for sabado/domingo",
+        ]
+        if any(s.startswith(m) for m in practical_markers):
+            return True
+
+        if ("45 min" in s or "60 min" in s or "90 min" in s) and (
+            "só tiveres" in s or "so tiveres" in s or "indoor" in s or "rolo" in s or
+            "sábado" in s or "sabado" in s or "domingo" in s
+        ):
+            return True
+
+        return False
 
     cleaned = [a for a in actions if not replaceable(a)]
     if not any(str(a).lower().startswith("plano normal") for a in cleaned):
@@ -929,8 +942,21 @@ def normalize_practical_actions(decision, context):
     cleaned.append(indoor)
     if is_weekend:
         cleaned.append(weekend)
-    if not any(("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower()) for a in cleaned):
-        cleaned.append("Recuperação/fueling: comer e hidratar de acordo com a sessão; não fazer défice agressivo em dia de qualidade.")
+    recovery_lines = [
+        a for a in cleaned
+        if ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
+    ]
+    cleaned = [
+        a for a in cleaned
+        if not ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
+    ]
+
+    if recovery_lines:
+        recovery = recovery_lines[0]
+    else:
+        recovery = "Recuperação/fueling: comer e hidratar de acordo com a sessão; não fazer défice agressivo em dia de qualidade."
+
+    cleaned.append(recovery)
 
     decision["actions"] = cleaned
     return decision
