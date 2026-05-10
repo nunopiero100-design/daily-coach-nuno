@@ -172,6 +172,11 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
     """Simple coaching guidance for weight loss without compromising training."""
     target_weight = 74.0
     planned = context.get("planned_events_today", [])
+    done_today_summary = context.get("done_today_summary", {})
+    done_today = bool(done_today_summary.get("has_activity"))
+    done_load = done_today_summary.get("load") or 0
+    done_hours = done_today_summary.get("hours") or 0
+
     planned_load = sum((e.get("load") or 0) for e in planned)
     planned_hours = sum((e.get("hours") or 0) for e in planned)
     names = " ".join(str(e.get("name") or "") for e in planned).lower()
@@ -180,9 +185,12 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
         "sweet spot", "threshold", "vo2", "zone 5", "zone 6", "over", "under",
         "tempo", "interval", "burst", "sprint", "test", "race"
     ]
-    is_quality = planned_load >= 65 or any(t in names for t in intense_terms)
-    is_long = planned_hours >= 2.0 or planned_load >= 100
-    is_rest_or_easy = planned_load <= 35 and not is_quality
+
+    effective_load = done_load if done_today else planned_load
+    effective_hours = done_hours if done_today else planned_hours
+    is_quality = effective_load >= 65 or any(t in names for t in intense_terms)
+    is_long = effective_hours >= 2.0 or effective_load >= 100
+    is_rest_or_easy = effective_load <= 35 and not is_quality
 
     ref_weight = weight_avg_7d if weight_avg_7d is not None else weight_today
     delta = (ref_weight - target_weight) if ref_weight is not None else None
@@ -206,7 +214,15 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
 
     lines.append("Proteína: 150–170 g/dia.")
 
-    if is_quality:
+    if done_today:
+        lines.append(f"Treino já concluído: {fmt(done_load,0)} TSS / {fmt_h(done_hours)}.")
+        lines.append("Agora o foco é recuperação, não mais carga.")
+        lines.append("Pós-treino: 30–40 g proteína + hidratos suficientes para repor glicogénio.")
+        if is_quality or done_hours >= 1.0:
+            lines.append("Hoje não fazer défice agressivo; deixa o treino assentar.")
+        else:
+            lines.append("Défice leve apenas se estiveres bem alimentado e sem fome/fadiga anormal.")
+    elif is_quality:
         lines.append("Hoje há qualidade/intensidade: não fazer défice agressivo; alimentar bem antes e depois.")
         if planned_hours >= 1.0:
             lines.append("Durante o treino: 60–80 g hidratos/h se a sessão passar de ~75 min ou tiver blocos duros.")
@@ -703,6 +719,13 @@ Regras específicas:
    - Domingo é social/livre; se não der para sair e houver 90 min indoor com carga razoável, considerar substituição válida.
    - Em todos estes casos, a decisão de hoje deve depender de readiness e do treino de hoje, não de “pagar” volume perdido.
 
+9. Alternativas com duração correta:
+   - A alternativa de 45 min nunca pode passar de 45 min.
+   - A alternativa de 60 min nunca pode passar de 60 min.
+   - A alternativa indoor de fim de semana deve caber em 90 min.
+   - Não usar blocos até FTP em alternativas; usar tempo/SS baixo @80–88%, salvo se o treino planeado for explicitamente threshold/teste.
+   - O plano B indoor deve ser igual ou mais fácil que o plano principal, nunca mais duro.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -831,6 +854,86 @@ Se estiveres inseguro, sê conservador.
 
     except Exception as e:
         return None, f"Erro OpenAI: {e}; usei regras heurísticas."
+
+
+def normalize_practical_actions(decision, context):
+    """
+    Forca alternativas praticas coerentes, porque o modelo pode errar contas de duracao.
+    - 45 min cabe em 45 min
+    - 60 min cabe em 60 min
+    - fim de semana indoor cabe em 90 min
+    - plano B nao deve ser mais duro que o plano principal
+    """
+    status = decision.get("status")
+    if status in ("JÁ FEITO", "DADOS INCOMPLETOS"):
+        return decision
+
+    actions = list(decision.get("actions") or [])
+    planned = context.get("planned_events_today", [])
+    cal = context.get("calendar_context", {})
+    is_weekend = bool(cal.get("weekend_indoor_alternative_required"))
+
+    name = ""
+    planned_load = 0
+    if planned:
+        name = str(planned[0].get("name") or "")
+        planned_load = planned[0].get("load") or 0
+
+    lname = name.lower()
+    is_quality = any(t in lname for t in [
+        "sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under",
+        "burst", "sprint", "test", "race"
+    ]) or planned_load >= 65
+    is_easy = planned_load <= 45 and not is_quality
+
+    if status == "VERMELHO":
+        a60 = "Se só tiveres 60 min: não usar para compensar; descanso total ou 45–60 min recovery muito leve em Z1/Z2."
+        a45 = "Se só tiveres 45 min: descanso total preferível; se precisares mexer as pernas, 30–45 min rolo muito fácil."
+        indoor = "Se for indoor/rolo: recovery muito leve, sem blocos, ou descanso total."
+        weekend = "Se for sábado/domingo e não der para sair: descanso total ou 45–60 min rolo muito fácil; nada de intensidade."
+    elif status == "AMARELO":
+        a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
+        a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
+        indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
+        weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
+    else:
+        if is_easy:
+            a60 = "Se só tiveres 60 min: 60 min Z2 fácil, HR controlada, sem blocos."
+            a45 = "Se só tiveres 45 min: 45 min Z2 fácil/recovery, RPE baixo."
+            indoor = "Se for indoor/rolo: Z2 fácil com boa ventilação; sem transformar em treino de intensidade."
+            weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — Z2 contínuo confortável, 3x1 min cadência alta opcional, sem intensidade."
+        else:
+            a60 = "Se só tiveres 60 min: 10 min aquecer, 2x12 min tempo/SS baixo @85–88% com 6 min Z2, resto Z2 fácil, 5 min arrefecer."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x8 min tempo/SS baixo @85–88% com 5 min Z2, 9 min Z2 fácil, 5 min arrefecer."
+            indoor = "Se for indoor/rolo: manter controlado; usar 85–88% para tempo/SS baixo, não ir até FTP; ventoinha forte e RPE estável."
+            weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
+
+    def replaceable(action):
+        s = str(action).lower()
+        return (
+            s.startswith("se só tiveres 60") or s.startswith("se so tiveres 60") or
+            s.startswith("se só tiveres 45") or s.startswith("se so tiveres 45") or
+            s.startswith("se for indoor") or
+            s.startswith("se for sábado/domingo") or s.startswith("se for sabado/domingo")
+        )
+
+    cleaned = [a for a in actions if not replaceable(a)]
+    if not any(str(a).lower().startswith("plano normal") for a in cleaned):
+        if planned:
+            cleaned.insert(0, f"Plano normal: fazer {name} conforme planeado, sem acrescentar carga.")
+        else:
+            cleaned.insert(0, "Plano normal: seguir o planeado; se não houver treino, descanso ou Z2 fácil.")
+
+    cleaned.append(a60)
+    cleaned.append(a45)
+    cleaned.append(indoor)
+    if is_weekend:
+        cleaned.append(weekend)
+    if not any(("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower()) for a in cleaned):
+        cleaned.append("Recuperação/fueling: comer e hidratar de acordo com a sessão; não fazer défice agressivo em dia de qualidade.")
+
+    decision["actions"] = cleaned
+    return decision
 
 
 def parse_openai_coach_text(response_text):
@@ -1133,6 +1236,13 @@ def main():
         "is_complete": len(missing_today_metrics) == 0,
     }
 
+    context["done_today_summary"] = {
+        "has_activity": bool(done_today),
+        "load": sum((a.get("load") or 0) for a in done_today),
+        "hours": sum((a.get("hours") or 0) for a in done_today),
+        "count": len(done_today),
+    }
+
     context["fueling_guidance"] = fueling_guidance(
         context,
         weight_today=context["today_metrics"].get("weight_kg"),
@@ -1169,7 +1279,11 @@ def main():
                 f"Atividade hoje: {fmt(done_today_load,0)} TSS / {fmt_h(done_today_hours)}.",
                 "O agente foi corrido depois do treino."
             ],
-            "actions": ["Não repetir treino.", "Priorizar recuperação, hidratação e nutrição pós-treino."],
+            "actions": [
+                "Não repetir treino.",
+                "Priorizar recuperação, hidratação e nutrição pós-treino.",
+                "Monitorizar sensação, sono e HRV amanhã para decidir a próxima sessão.",
+            ],
             "should_modify_intervals": False,
             "source": "done_detection",
         }
@@ -1180,10 +1294,12 @@ def main():
         if ai_error:
             decision.setdefault("reasons", []).append(ai_error)
 
+    decision = normalize_practical_actions(decision, context)
+
     # Automatic practical weekend alternative even if the model forgets it.
     try:
         cal = context.get("calendar_context", {})
-        if cal.get("weekend_indoor_alternative_required"):
+        if cal.get("weekend_indoor_alternative_required") and decision.get("status") not in ("JÁ FEITO", "DADOS INCOMPLETOS"):
             actions = decision.setdefault("actions", [])
             has_weekend_indoor = any(("90" in str(a) and ("indoor" in str(a).lower() or "rolo" in str(a).lower())) for a in actions)
             if not has_weekend_indoor:
@@ -1192,7 +1308,7 @@ def main():
                 elif decision.get("status") == "AMARELO":
                     actions.append("Se for sábado/domingo e não der para sair: 90 min indoor com 60–70 min Z2 fácil + 2x8 min tempo leve se as pernas responderem bem; sem forçar.")
                 else:
-                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor/rolo — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar em Z2, 10 min arrefecer.")
+                    actions.append("Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer.")
     except Exception:
         pass
 
