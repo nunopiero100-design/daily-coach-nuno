@@ -726,6 +726,11 @@ Regras específicas:
    - Não usar blocos até FTP em alternativas; usar tempo/SS baixo @80–88%, salvo se o treino planeado for explicitamente threshold/teste.
    - O plano B indoor deve ser igual ou mais fácil que o plano principal, nunca mais duro.
 
+10. Regra chuva/fim de semana por duração:
+   - Se for sábado/domingo e o treino planeado tiver até 2h, não criar alternativa indoor de 90 min.
+   - Para treinos até 2h, dizer apenas: se chover ou as condições forem desfavoráveis, faz o treino planeado indoor/rolo.
+   - Só criar alternativa indoor de 90 min se o treino planeado for acima de 2h, social ride, group ride, endurance longo ou saída outdoor longa.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -875,9 +880,11 @@ def normalize_practical_actions(decision, context):
 
     name = ""
     planned_load = 0
+    planned_hours = 0
     if planned:
         name = str(planned[0].get("name") or "")
         planned_load = planned[0].get("load") or 0
+        planned_hours = planned[0].get("hours") or 0
 
     lname = name.lower()
     is_quality = any(t in lname for t in [
@@ -886,27 +893,33 @@ def normalize_practical_actions(decision, context):
     ]) or planned_load >= 65
     is_easy = planned_load <= 45 and not is_quality
 
+    long_or_social_weekend = planned_hours > 2.05 or any(t in lname for t in ["social", "group ride", "long", "longo", "endurance ride", "ride 3h", "ride 4h", "ride 5h"])
+
     if status == "VERMELHO":
         a60 = "Se só tiveres 60 min: não usar para compensar; descanso total ou 45–60 min recovery muito leve em Z1/Z2."
         a45 = "Se só tiveres 45 min: descanso total preferível; se precisares mexer as pernas, 30–45 min rolo muito fácil."
         indoor = "Se for indoor/rolo: recovery muito leve, sem blocos, ou descanso total."
-        weekend = "Se for sábado/domingo e não der para sair: descanso total ou 45–60 min rolo muito fácil; nada de intensidade."
+        weekend_alt = "Se for sábado/domingo e não der para sair: descanso total ou 45–60 min rolo muito fácil; nada de intensidade."
+        weekend_weather = "Se chover/condições forem más: não forces a saída; descanso total ou recovery muito leve."
     elif status == "AMARELO":
         a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
         a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
         indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
-        weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
+        weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
+        weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
     else:
         if is_easy:
             a60 = "Se só tiveres 60 min: 60 min Z2 fácil, HR controlada, sem blocos."
             a45 = "Se só tiveres 45 min: 45 min Z2 fácil/recovery, RPE baixo."
             indoor = "Se for indoor/rolo: Z2 fácil com boa ventilação; sem transformar em treino de intensidade."
-            weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — Z2 contínuo confortável, 3x1 min cadência alta opcional, sem intensidade."
+            weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — Z2 contínuo confortável, 3x1 min cadência alta opcional, sem intensidade."
+            weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo, mantendo Z2 fácil e RPE baixo."
         else:
             a60 = "Se só tiveres 60 min: 10 min aquecer, 2x12 min tempo/SS baixo @85–88% com 6 min Z2, resto Z2 fácil, 5 min arrefecer."
             a45 = "Se só tiveres 45 min: 10 min aquecer, 2x8 min tempo/SS baixo @85–88% com 5 min Z2, 9 min Z2 fácil, 5 min arrefecer."
             indoor = "Se for indoor/rolo: manter controlado; usar 85–88% para tempo/SS baixo, não ir até FTP; ventoinha forte e RPE estável."
-            weekend = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
+            weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
+            weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo como planeado; é até 2h e é fazível no rolo. Ventoinha forte, hidratação e RPE controlado."
 
     def replaceable(action):
         s = str(action).lower().strip()
@@ -916,6 +929,7 @@ def normalize_practical_actions(decision, context):
             "se só tiveres 45", "se so tiveres 45", "if só tiveres 45", "if so tiveres 45",
             "se tiveres 60", "se tiveres 45",
             "se for indoor", "if for indoor",
+            "se chover", "if chover", "se as condições", "se as condicoes",
             "se for sábado/domingo", "se for sabado/domingo",
             "if for sábado/domingo", "if for sabado/domingo",
         ]
@@ -941,7 +955,10 @@ def normalize_practical_actions(decision, context):
     cleaned.append(a45)
     cleaned.append(indoor)
     if is_weekend:
-        cleaned.append(weekend)
+        if long_or_social_weekend:
+            cleaned.append(weekend_alt)
+        else:
+            cleaned.append(weekend_weather)
     recovery_lines = [
         a for a in cleaned
         if ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
