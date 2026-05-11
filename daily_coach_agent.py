@@ -37,6 +37,9 @@ from pathlib import Path
 
 import requests
 
+from backend.renderers import render_daily_email
+from backend.structured_report_builder import build_structured_daily_report
+
 API_BASE = "https://intervals.icu/api/v1"
 AUTH_USER = "API_KEY"
 OPENAI_BASE = "https://api.openai.com/v1/responses"
@@ -1446,7 +1449,27 @@ def main():
     lines.append("")
 
     report = "\n".join(lines)
+
+    structured_report = build_structured_daily_report(
+        target=target,
+        context=context,
+        decision=decision,
+        report_text=report,
+        auto_apply=auto_apply,
+    )
+
+    rendered_email = render_daily_email(structured_report)
+
     Path("daily_agent_report.txt").write_text(report, encoding="utf-8")
+    Path("daily_coach_structured_report.json").write_text(
+        structured_report.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    Path("daily_coach_rendered_email.txt").write_text(
+        rendered_email,
+        encoding="utf-8",
+    )
+
     Path("daily_agent_report.json").write_text(json.dumps({
         "context": context,
         "heuristic_decision": heuristic,
