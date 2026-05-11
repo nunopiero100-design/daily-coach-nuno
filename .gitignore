@@ -11,3 +11,6 @@ data/reports/
 
 # Generated feedback
 data/feedback/
+
+# Environment secrets
+.env
