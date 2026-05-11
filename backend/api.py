@@ -2,8 +2,15 @@ import datetime as dt
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from pydantic import BaseModel
 
 from backend.auth import require_app_token
+from backend.feedback import (
+    FeedbackEntry,
+    list_feedback,
+    load_feedback_for_date,
+    save_feedback,
+)
 from backend.storage import DEFAULT_REPORTS_DIR, list_daily_reports, load_daily_report
 
 
@@ -12,6 +19,11 @@ app = FastAPI(
     version="0.1.0",
     description="API local para servir relatórios estruturados do Daily Coach.",
 )
+
+class FeedbackRequest(BaseModel):
+    date: dt.date
+    type: str
+    note: str | None = None
 
 
 @app.get("/health")
@@ -88,3 +100,58 @@ def get_report_by_date(
             status_code=404,
             detail=f"No report found for date: {report_date}",
         )
+
+@app.post("/api/v1/feedback")
+def create_feedback(
+    payload: FeedbackRequest,
+    _: None = Depends(require_app_token),
+):
+    feedback = FeedbackEntry(
+        date=payload.date,
+        type=payload.type,
+        note=payload.note,
+    )
+
+    saved_path = save_feedback(feedback)
+
+    return {
+        "status": "saved",
+        "path": str(saved_path),
+        "feedback": json_safe_feedback(feedback),
+    }
+
+
+@app.get("/api/v1/feedback")
+def get_feedback(
+    date: str | None = None,
+    _: None = Depends(require_app_token),
+):
+    if date:
+        try:
+            dt.date.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid date format. Use YYYY-MM-DD.",
+            )
+
+        return {
+            "count": len(load_feedback_for_date(date)),
+            "feedback": load_feedback_for_date(date),
+        }
+
+    feedback = list_feedback()
+
+    return {
+        "count": len(feedback),
+        "feedback": feedback,
+    }
+
+
+def json_safe_feedback(feedback: FeedbackEntry) -> dict:
+    return {
+        "date": feedback.date.isoformat(),
+        "type": feedback.type,
+        "note": feedback.note,
+        "created_at": feedback.created_at.isoformat(),
+    }

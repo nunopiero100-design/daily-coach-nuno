@@ -62,12 +62,35 @@ def main():
     print("Run now:", run_now_response.status_code)
     print(run_now_response.json()["status"])
 
+    feedback_response = client.post(
+        "/api/v1/feedback",
+        headers=headers,
+        json={
+            "date": today.isoformat(),
+            "type": "NO_TIME",
+            "note": "Só tenho 45 minutos hoje.",
+        },
+    )
+    print("Feedback POST:", feedback_response.status_code)
+    print(feedback_response.json()["status"])
+
+    feedback_get_response = client.get(
+        f"/api/v1/feedback?date={today.isoformat()}",
+        headers=headers,
+    )
+    print("Feedback GET:", feedback_get_response.status_code)
+    print("Feedback count:", feedback_get_response.json()["count"])
+
     assert health.status_code == 200
     assert today_response.status_code == 200
     assert list_response.status_code == 200
     assert date_response.status_code == 200
     assert run_now_response.status_code == 200
     assert run_now_response.json()["status"] == "not_implemented"
+    assert feedback_response.status_code == 200
+    assert feedback_response.json()["status"] == "saved"
+    assert feedback_get_response.status_code == 200
+    assert feedback_get_response.json()["count"] >= 1
 
     print("API test OK")
 

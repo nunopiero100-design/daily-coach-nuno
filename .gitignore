@@ -8,3 +8,6 @@ tmp/
 
 # Generated reports
 data/reports/
+
+# Generated feedback
+data/feedback/
