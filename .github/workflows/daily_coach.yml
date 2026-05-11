@@ -59,13 +59,15 @@ jobs:
 
           python daily_coach_agent.py $EXTRA_ARGS --debug --email
 
-      - name: Upload reports
+            - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
           name: daily-coach-report
           path: |
             daily_agent_report.txt
             daily_agent_report.json
+            daily_coach_structured_report.json
+            daily_coach_rendered_email.txt
             last_update_payload.json
             debug_raw_agent.json
           if-no-files-found: ignore
