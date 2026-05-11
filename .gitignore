@@ -5,3 +5,6 @@ __pycache__/
 
 # Local test output
 tmp/
+
+# Generated reports
+data/reports/
