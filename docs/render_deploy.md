@@ -27,3 +27,13 @@ O serviço criado deve chamar-se:
 
 ```text
 daily-coach-api
+
+```text
+DATA_DIR=/app/data
+
+O backend usa `DATA_DIR` como pasta base para storage local.
+
+Exemplo:
+
+```text
+DATA_DIR=/app/data

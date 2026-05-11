@@ -15,8 +15,9 @@ FeedbackType = Literal[
     "MANUAL_NOTE",
 ]
 
+from backend.paths import get_feedback_dir
 
-DEFAULT_FEEDBACK_DIR = Path("data/feedback")
+DEFAULT_FEEDBACK_DIR = get_feedback_dir()
 
 
 class FeedbackEntry(BaseModel):

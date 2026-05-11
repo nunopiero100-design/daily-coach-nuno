@@ -1,9 +1,10 @@
 from pathlib import Path
 
+from backend.paths import get_reports_dir
 from backend.schemas import DailyCoachReport
 
 
-DEFAULT_REPORTS_DIR = Path("data/reports")
+DEFAULT_REPORTS_DIR = get_reports_dir()
 
 
 def save_daily_report(
