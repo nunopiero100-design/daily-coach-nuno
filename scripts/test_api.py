@@ -1,4 +1,5 @@
 import datetime as dt
+import os
 import shutil
 from pathlib import Path
 
@@ -15,6 +16,8 @@ def main():
     test_reports_dir.mkdir(parents=True, exist_ok=True)
 
     today = dt.date.today()
+
+    os.environ["APP_TOKEN"] = "test-token"
 
     report = DailyCoachReport(
         date=today,
@@ -33,19 +36,22 @@ def main():
     save_daily_report(report, reports_dir=test_reports_dir)
 
     client = TestClient(app)
-
+    
+    headers = {"Authorization": "Bearer test-token"}
+    
     health = client.get("/health")
+
     print("Health:", health.status_code, health.json())
 
-    today_response = client.get("/api/v1/reports/today")
+    today_response = client.get("/api/v1/reports/today", headers=headers)
     print("Today:", today_response.status_code)
     print(today_response.json()["title"])
 
-    list_response = client.get("/api/v1/reports")
+    list_response = client.get("/api/v1/reports", headers=headers)
     print("Reports:", list_response.status_code)
     print("Count:", list_response.json()["count"])
 
-    date_response = client.get(f"/api/v1/reports/{today.isoformat()}")
+    date_response = client.get(f"/api/v1/reports/{today.isoformat()}", headers=headers)
     print("By date:", date_response.status_code)
     print(date_response.json()["recommendation"]["action"])
 

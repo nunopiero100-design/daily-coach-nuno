@@ -1,8 +1,9 @@
 import datetime as dt
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 
+from backend.auth import require_app_token
 from backend.storage import DEFAULT_REPORTS_DIR, list_daily_reports, load_daily_report
 
 
@@ -24,6 +25,7 @@ def health():
 @app.get("/api/v1/reports")
 def get_reports(
     limit: int = Query(default=30, ge=1, le=365),
+    _: None = Depends(require_app_token),
 ):
     report_paths = list_daily_reports(DEFAULT_REPORTS_DIR)[:limit]
 
@@ -41,7 +43,9 @@ def get_reports(
 
 
 @app.get("/api/v1/reports/today")
-def get_today_report():
+def get_today_report(
+    _: None = Depends(require_app_token),
+):
     today = dt.date.today().isoformat()
 
     try:
@@ -54,7 +58,10 @@ def get_today_report():
 
 
 @app.get("/api/v1/reports/{report_date}")
-def get_report_by_date(report_date: str):
+def get_report_by_date(
+    report_date: str,
+    _: None = Depends(require_app_token),
+):
     try:
         dt.date.fromisoformat(report_date)
     except ValueError:
