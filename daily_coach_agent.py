@@ -38,6 +38,7 @@ from pathlib import Path
 import requests
 
 from backend.renderers import render_daily_email
+from backend.storage import save_daily_report
 from backend.structured_report_builder import build_structured_daily_report
 
 API_BASE = "https://intervals.icu/api/v1"
@@ -1460,6 +1461,8 @@ def main():
 
     rendered_email = render_daily_email(structured_report)
 
+    saved_report_path = save_daily_report(structured_report)
+
     Path("daily_agent_report.txt").write_text(report, encoding="utf-8")
     Path("daily_coach_structured_report.json").write_text(
         structured_report.model_dump_json(indent=2),
@@ -1475,6 +1478,7 @@ def main():
         "heuristic_decision": heuristic,
         "decision": decision,
         "ai_error": ai_error,
+        "structured_report_path": str(saved_report_path),
         "applied": applied,
         "apply_error": apply_error,
     }, indent=2, ensure_ascii=False, default=str), encoding="utf-8")

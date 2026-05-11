@@ -68,6 +68,7 @@ jobs:
             daily_agent_report.json
             daily_coach_structured_report.json
             daily_coach_rendered_email.txt
+            data/reports/*.json
             last_update_payload.json
             debug_raw_agent.json
           if-no-files-found: ignore
