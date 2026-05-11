@@ -53,12 +53,21 @@ def main():
 
     date_response = client.get(f"/api/v1/reports/{today.isoformat()}", headers=headers)
     print("By date:", date_response.status_code)
-    print(date_response.json()["recommendation"]["action"])
+    print("By date body:", date_response.json())
+
+    if date_response.status_code == 200:
+        print(date_response.json()["recommendation"]["action"])
+
+    run_now_response = client.post("/api/v1/reports/run-now", headers=headers)
+    print("Run now:", run_now_response.status_code)
+    print(run_now_response.json()["status"])
 
     assert health.status_code == 200
     assert today_response.status_code == 200
     assert list_response.status_code == 200
     assert date_response.status_code == 200
+    assert run_now_response.status_code == 200
+    assert run_now_response.json()["status"] == "not_implemented"
 
     print("API test OK")
 

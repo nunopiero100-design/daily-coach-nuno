@@ -57,6 +57,17 @@ def get_today_report(
         )
 
 
+@app.post("/api/v1/reports/run-now")
+def run_daily_coach_now(
+    _: None = Depends(require_app_token),
+):
+    return {
+        "status": "not_implemented",
+        "message": "Run-now endpoint reserved for future Daily Coach execution.",
+        "next_step": "This will eventually trigger daily_coach_agent.py with rate limiting and safe execution.",
+    }
+
+
 @app.get("/api/v1/reports/{report_date}")
 def get_report_by_date(
     report_date: str,
