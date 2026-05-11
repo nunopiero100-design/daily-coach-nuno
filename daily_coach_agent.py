@@ -206,11 +206,14 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
         lines.append("Média 7d: n/d.")
     if delta is not None:
         if delta > 0:
-            lines.append(f"Objetivo 74 kg: faltam ~{fmt(delta,1)} kg; apontar para 0,25–0,40 kg/semana.")
+            lines.append(f"Objetivo 74 kg: faltam ~{fmt(delta,1)} kg pela média 7d; apontar para 0,25–0,40 kg/semana.")
         else:
-            lines.append("Objetivo 74 kg: já estás na zona-alvo; proteger potência e recuperação.")
+            lines.append("Objetivo 74 kg: já estás na zona-alvo pela média 7d; proteger potência e recuperação.")
     else:
         lines.append("Objetivo 74 kg: usar média semanal, não o peso de um único dia.")
+
+    if weight_today is not None and weight_avg_7d is not None and weight_today < weight_avg_7d - 0.6:
+        lines.append("Peso de hoje está bem abaixo da média 7d; tratar como oscilação/hidratação e não apertar dieta por causa de um dia.")
 
     lines.append("Proteína: 150–170 g/dia.")
 
@@ -385,11 +388,19 @@ def compliance_check(planned_events, done_activities):
     substitution_valid = False
 
     if planned_events and done_activities:
+        duration_ratio = done_hours / planned_hours if planned_hours and planned_hours > 0 else 1.0
+
+        if ratio > 1.25:
+            status = "FEITO MAS MAIS DURO"
+            interpretation = "Carga acima do planeado. Observar readiness antes de manter intensidade nos dias seguintes."
+        elif ratio >= 0.85 and duration_ratio >= 0.80:
+            status = "CUMPRIDO"
+            interpretation = "Treino cumprido dentro de margem normal."
         # Weekend practical logic:
-        # - Saturday for Nuno is usually max 2h; 75-90min indoor can be a valid shorter version.
+        # - Saturday for Nuno is usually max 2h; 75-90min indoor can be a valid shorter version only if it was actually shorter.
         # - Sunday is social/free; 90min indoor quality is a valid substitute if outdoor/social fails.
-        # Do not classify these as simple failure.
-        if is_weekend and planned_hours >= 1.75 and 1.0 <= done_hours <= 2.25 and done_load >= 45 and ratio >= 0.45:
+        # Do not classify these as simple failure, but only when the session was materially shorter/lower than planned.
+        elif is_weekend and planned_hours >= 1.75 and 1.0 <= done_hours <= 2.25 and done_load >= 45 and ratio >= 0.45 and (duration_ratio < 0.80 or planned_hours >= 2.5):
             substitution_valid = True
             no_compensation = True
             if planned_hours >= 2.5:
@@ -397,13 +408,7 @@ def compliance_check(planned_events, done_activities):
                 interpretation = "Fim de semana: volume abaixo do planeado, mas houve estímulo válido. Não compensar volume perdido à força."
             else:
                 status = "VERSÃO CURTA CUMPRIDA"
-                interpretation = "Sábado/treino curto: estímulo principal provavelmente cumprido numa versão mais curta. Não compensar no dia seguinte."
-        elif ratio > 1.25:
-            status = "FEITO MAS MAIS DURO"
-            interpretation = "Carga acima do planeado. Observar readiness antes de manter intensidade nos dias seguintes."
-        elif ratio >= 0.85:
-            status = "CUMPRIDO"
-            interpretation = "Treino cumprido dentro de margem normal."
+                interpretation = "Fim de semana/treino até 2h: versão curta válida. Não compensar no dia seguinte."
         elif ratio >= 0.55:
             status = "PARCIAL / MAIS LEVE"
             interpretation = "Treino parcial/mais leve. Não compensar automaticamente; decidir pelo estado de hoje."
@@ -949,7 +954,13 @@ def normalize_practical_actions(decision, context):
         if planned:
             cleaned.insert(0, f"Plano normal: fazer {name} conforme planeado, sem acrescentar carga.")
         else:
-            cleaned.insert(0, "Plano normal: seguir o planeado; se não houver treino, descanso ou Z2 fácil.")
+            cleaned.insert(0, "Plano normal: descanso total preferencial; se quiseres pedalar, Z2 muito fácil, sem blocos.")
+
+    no_planned_workout = not planned or planned_load <= 5
+    if no_planned_workout:
+        a60 = "Se quiseres rolar 60 min: Z2 muito fácil/recovery, HR controlada, sem blocos."
+        a45 = "Se quiseres rolar 45 min: recovery muito fácil ou descanso total."
+        indoor = "Se for indoor/rolo: rolar muito fácil com boa ventilação; não transformar descanso em treino."
 
     cleaned.append(a60)
     cleaned.append(a45)
