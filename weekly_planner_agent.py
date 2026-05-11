@@ -703,6 +703,7 @@ def main():
         week_start = monday_of(today_pt)
 
     macro_week = ((week_start - plan_start).days // 7) + 1
+    pre_plan = week_start < plan_start
 
     client = IntervalsClient(athlete_id, key)
     athlete = client.athlete()
@@ -731,15 +732,25 @@ def main():
     no_bike_previous, previous_no_bike_event = has_no_bike_week(events, week_start - dt.timedelta(days=7), week_start - dt.timedelta(days=1))
 
     prior = summarize_prior_week(events, activities, week_start)
-    if no_bike_current:
+    if pre_plan:
+        adjustment = "pre_plan_observation"
+        reasons = [
+            f"Semana anterior ao PLAN_START_DATE ({plan_start.isoformat()}).",
+            "Plano principal ainda é FasCat/observação; não gerar treinos do plano Coach Nuno antes do arranque.",
+            "Usar este relatório apenas para analisar carga realizada, wellness e tendência."
+        ]
+        week_events = []
+    elif no_bike_current:
         adjustment = "no_bike"
         reasons = ["NO BIKE WEEK detetada no Intervals. Não criar treinos de bicicleta; não compensar carga perdida."]
+        week_events = build_events(week_start, macro_week, adjustment, plan_id)
     elif no_bike_previous:
         adjustment = "reentry"
         reasons = ["Semana anterior marcada como NO BIKE WEEK. Criar semana de reentrada progressiva, sem VO2 pesado logo de início."]
+        week_events = build_events(week_start, macro_week, adjustment, plan_id)
     else:
         adjustment, reasons = decide_adjustment(macro_week, prior, latest_w)
-    week_events = build_events(week_start, macro_week, adjustment, plan_id)
+        week_events = build_events(week_start, macro_week, adjustment, plan_id)
 
     total_load = sum(e["load"] for e in week_events)
     total_hours = sum(e["moving_time"] for e in week_events) / 3600
@@ -748,7 +759,9 @@ def main():
     applied = False
     apply_msg = "Não aplicado."
     if allow_apply:
-        if week_events:
+        if pre_plan:
+            apply_msg = "PRÉ-PLANO: nada aplicado antes do PLAN_START_DATE."
+        elif week_events:
             client.upload_bulk_events(week_events)
             applied = True
             apply_msg = f"{len(week_events)} treinos criados/atualizados no Intervals."
@@ -765,12 +778,14 @@ def main():
     lines.append("="*72)
     lines.append(f"Atleta: {athlete.get('name') or athlete.get('id') or 'n/d'}")
     lines.append(f"Ajuste semanal: {adjustment}")
-    if adjustment == "no_bike":
+    if adjustment == "pre_plan_observation":
+        lines.append("Modo especial: PRÉ-PLANO / FasCat em observação.")
+    elif adjustment == "no_bike":
         lines.append("Modo especial: NO BIKE WEEK / férias sem bicicleta.")
     elif adjustment == "reentry":
         lines.append("Modo especial: reentrada progressiva após NO BIKE WEEK.")
     if macro_week <= 0:
-        lines.append("Nota: esta é uma semana anterior ao PLAN_START_DATE. Para testar a semana 1, usa target_week_start=2026-05-11.")
+        lines.append(f"Nota: esta é uma semana anterior ao PLAN_START_DATE ({plan_start.isoformat()}). A semana 1 começa em {plan_start.isoformat()}.")
     lines.append("")
     lines.append("SEMANA ANTERIOR")
     lines.append(f"Estado: {prior['status']}")
@@ -787,23 +802,30 @@ def main():
     lines += [f"- {r}" for r in reasons]
     lines.append("")
     lines.append("PLANO DA SEMANA")
-    lines.append(f"Total estimado: {fmt(total_load,0)} TSS | {fmt_h(total_hours)}")
-    if not week_events and adjustment == "no_bike":
-        lines.append("- Sem treinos de ciclismo criados esta semana.")
-        lines.append("- Manutenção sugerida: caminhadas, mobilidade e core leve 2-3x, sem tentar simular VO2/threshold fora da bicicleta.")
-        lines.append("- Regresso: semana seguinte deve ser progressiva, sem compensar carga perdida.")
-    for e in week_events:
-        lines.append(f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)}")
+    if adjustment == "pre_plan_observation":
+        lines.append("- Pré-plano: não gerar proposta semanal do Coach Nuno antes do PLAN_START_DATE.")
+        lines.append("- Mantém FasCat como plano principal e usa o Daily Coach para validar o dia.")
+        lines.append("- O Weekly serve apenas para observar carga/wellness até ao arranque do plano em " + plan_start.isoformat() + ".")
+    else:
+        lines.append(f"Total estimado: {fmt(total_load,0)} TSS | {fmt_h(total_hours)}")
+        if not week_events and adjustment == "no_bike":
+            lines.append("- Sem treinos de ciclismo criados esta semana.")
+            lines.append("- Manutenção sugerida: caminhadas, mobilidade e core leve 2-3x, sem tentar simular VO2/threshold fora da bicicleta.")
+            lines.append("- Regresso: semana seguinte deve ser progressiva, sem compensar carga perdida.")
+        for e in week_events:
+            lines.append(f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)}")
     lines.append("")
     lines.append("INTERVALS")
     lines.append(f"- {apply_msg}")
     lines.append("")
-    lines.append("Nota: o daily agent continua a ajustar cada dia às 08:00 conforme sono/HRV/fadiga.")
+    lines.append("Nota: o daily agent continua a ajustar cada dia às 08:20 conforme sono/HRV/fadiga.")
     report = "\n".join(lines)
 
     json_payload = {
         "week_start": week_start.isoformat(),
         "macro_week": macro_week,
+        "pre_plan": pre_plan,
+        "plan_start": plan_start.isoformat(),
         "adjustment": adjustment,
         "reasons": reasons,
         "prior_week": prior,
