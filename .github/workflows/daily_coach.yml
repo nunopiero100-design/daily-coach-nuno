@@ -59,7 +59,7 @@ jobs:
 
           python daily_coach_agent.py $EXTRA_ARGS --debug --email
 
-            - name: Upload reports
+      - name: Upload reports
         uses: actions/upload-artifact@v4
         with:
           name: daily-coach-report
