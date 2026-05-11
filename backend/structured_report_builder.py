@@ -26,17 +26,26 @@ def map_status_for_structured_report(status: str | None) -> str:
     return "INCOMPLETE"
 
 
-def map_action_for_structured_report(status: str | None, decision: dict) -> str:
+def map_action_for_structured_report(
+    status: str | None,
+    decision: dict,
+    has_planned_workout: bool = True,
+) -> str:
+    if status == "DADOS INCOMPLETOS":
+        return "SYNC_REQUIRED"
+
+    if status == "JÁ FEITO":
+        return "NO_TRAINING_TODAY"
+
+    if not has_planned_workout:
+        return "NO_TRAINING_TODAY"
+
     if status == "VERDE":
         return "KEEP"
     if status == "AMARELO":
         return "REDUCE"
     if status == "VERMELHO":
         return "RECOVERY"
-    if status == "DADOS INCOMPLETOS":
-        return "SYNC_REQUIRED"
-    if status == "JÁ FEITO":
-        return "NO_TRAINING_TODAY"
 
     actions_text = " ".join(str(a) for a in decision.get("actions", [])).lower()
 
@@ -76,7 +85,11 @@ def build_structured_daily_report(
 
     status_raw = decision.get("status")
     structured_status = map_status_for_structured_report(status_raw)
-    recommendation_action = map_action_for_structured_report(status_raw, decision)
+    recommendation_action = map_action_for_structured_report(
+    status_raw,
+    decision,
+    has_planned_workout=bool(planned_events),
+)
 
     actions = decision.get("actions", []) or []
     reasons = decision.get("reasons", []) or []
@@ -113,12 +126,12 @@ def build_structured_daily_report(
         summary=summary,
         full_text=report_text,
         planned_workout=PlannedWorkout(
-            name=first_planned.get("name"),
-            description=None,
-            duration_minutes=round(planned_hours * 60) if planned_hours is not None else None,
-            planned_tss=first_planned.get("load"),
-            source="FasCat",
-        ),
+    name=first_planned.get("name"),
+    description=None,
+    duration_minutes=round(planned_hours * 60) if planned_hours is not None else None,
+    planned_tss=first_planned.get("load"),
+    source="FasCat" if planned_events else None,
+),
         completed_activity=CompletedActivity(
             exists=bool(completed_today),
             name=first_completed.get("name"),
