@@ -25,15 +25,20 @@ No Render:
 
 O serviço criado deve chamar-se:
 
-```text
-daily-coach-api
+`daily-coach-api`
 
-```text
-DATA_DIR=/app/data
+---
 
-O backend usa `DATA_DIR` como pasta base para storage local.
+## 3. Variáveis de ambiente
 
-Exemplo:
+Configurar manualmente no Render:
 
-```text
-DATA_DIR=/app/data
+`APP_TOKEN=<token-forte>`
+
+Gerar token forte localmente:
+
+```bash
+python - <<'PY'
+import secrets
+print(secrets.token_urlsafe(32))
+PY
