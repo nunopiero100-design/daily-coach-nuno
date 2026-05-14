@@ -37,10 +37,6 @@ from pathlib import Path
 
 import requests
 
-from backend.renderers import render_daily_email
-from backend.storage import save_daily_report
-from backend.structured_report_builder import build_structured_daily_report
-
 API_BASE = "https://intervals.icu/api/v1"
 AUTH_USER = "API_KEY"
 OPENAI_BASE = "https://api.openai.com/v1/responses"
@@ -187,14 +183,18 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
 
     intense_terms = [
         "sweet spot", "threshold", "vo2", "zone 5", "zone 6", "over", "under",
-        "tempo", "interval", "burst", "sprint", "test", "race"
+        "tempo", "interval", "burst", "sprint", "test", "race", "cheetah", "pounce"
+    ]
+    easy_terms = [
+        "zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"
     ]
 
     effective_load = done_load if done_today else planned_load
     effective_hours = done_hours if done_today else planned_hours
-    is_quality = effective_load >= 65 or any(t in names for t in intense_terms)
+    is_planned_easy = any(t in names for t in easy_terms)
+    is_quality = (any(t in names for t in intense_terms) or effective_load >= 80) and not is_planned_easy
     is_long = effective_hours >= 2.0 or effective_load >= 100
-    is_rest_or_easy = effective_load <= 35 and not is_quality
+    is_rest_or_easy = is_planned_easy or (effective_load <= 35 and not is_quality)
 
     ref_weight = weight_avg_7d if weight_avg_7d is not None else weight_today
     delta = (ref_weight - target_weight) if ref_weight is not None else None
@@ -229,6 +229,10 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
             lines.append("Hoje não fazer défice agressivo; deixa o treino assentar.")
         else:
             lines.append("Défice leve apenas se estiveres bem alimentado e sem fome/fadiga anormal.")
+    elif is_planned_easy and effective_hours >= 1.25:
+        lines.append("Hoje é Z2/endurance: foco em recuperação ativa e aeróbico, não intensidade.")
+        lines.append("Durante o treino: 30–45 g hidratos/h é suficiente para Z2 de ~75–120 min; água/eletrólitos se for muito fácil.")
+        lines.append("Défice leve é aceitável, mas sem sair vazio após dois dias de qualidade.")
     elif is_quality:
         lines.append("Hoje há qualidade/intensidade: não fazer défice agressivo; alimentar bem antes e depois.")
         if planned_hours >= 1.0:
@@ -740,6 +744,12 @@ Regras específicas:
    - Para treinos até 2h, dizer apenas: se chover ou as condições forem desfavoráveis, faz o treino planeado indoor/rolo.
    - Só criar alternativa indoor de 90 min se o treino planeado for acima de 2h, social ride, group ride, endurance longo ou saída outdoor longa.
 
+11. Regra para treino Z2/endurance planeado:
+   - Se o treino planeado contiver Zone 2, Z2, Endurance, Recovery ou fácil, as alternativas de 45/60 min devem continuar Z2/recovery.
+   - Não sugerir tempo, sweet spot, threshold ou blocos quando o treino planeado do dia é Z2/endurance.
+   - Se houver qualidade nos dias anteriores, reforçar que hoje é para absorver carga e manter HR/RPE baixos.
+   - Fueling para Z2 75–120 min: normalmente 30–45 g hidratos/h, não 60–80 g/h obrigatório.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -896,11 +906,16 @@ def normalize_practical_actions(decision, context):
         planned_hours = planned[0].get("hours") or 0
 
     lname = name.lower()
-    is_quality = any(t in lname for t in [
+    easy_terms = [
+        "zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"
+    ]
+    quality_terms = [
         "sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under",
-        "burst", "sprint", "test", "race"
-    ]) or planned_load >= 65
-    is_easy = planned_load <= 45 and not is_quality
+        "burst", "sprint", "test", "race", "cheetah", "pounce"
+    ]
+    is_planned_easy = any(t in lname for t in easy_terms)
+    is_quality = (any(t in lname for t in quality_terms) or planned_load >= 65) and not is_planned_easy
+    is_easy = is_planned_easy or (planned_load <= 45 and not is_quality)
 
     long_or_social_weekend = planned_hours > 2.05 or any(t in lname for t in ["social", "group ride", "long", "longo", "endurance ride", "ride 3h", "ride 4h", "ride 5h"])
 
@@ -918,9 +933,9 @@ def normalize_practical_actions(decision, context):
         weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
     else:
         if is_easy:
-            a60 = "Se só tiveres 60 min: 60 min Z2 fácil, HR controlada, sem blocos."
-            a45 = "Se só tiveres 45 min: 45 min Z2 fácil/recovery, RPE baixo."
-            indoor = "Se for indoor/rolo: Z2 fácil com boa ventilação; sem transformar em treino de intensidade."
+            a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
+            a45 = "Se só tiveres 45 min: 45 min recovery/Z2 muito fácil ou descanso, sem blocos."
+            indoor = "Se for indoor/rolo: fazer Z2 fácil/recovery com boa ventilação; não transformar em tempo/SS."
             weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — Z2 contínuo confortável, 3x1 min cadência alta opcional, sem intensidade."
             weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo, mantendo Z2 fácil e RPE baixo."
         else:
@@ -1450,35 +1465,12 @@ def main():
     lines.append("")
 
     report = "\n".join(lines)
-
-    structured_report = build_structured_daily_report(
-        target=target,
-        context=context,
-        decision=decision,
-        report_text=report,
-        auto_apply=auto_apply,
-    )
-
-    rendered_email = render_daily_email(structured_report)
-
-    saved_report_path = save_daily_report(structured_report)
-
     Path("daily_agent_report.txt").write_text(report, encoding="utf-8")
-    Path("daily_coach_structured_report.json").write_text(
-        structured_report.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
-    Path("daily_coach_rendered_email.txt").write_text(
-        rendered_email,
-        encoding="utf-8",
-    )
-
     Path("daily_agent_report.json").write_text(json.dumps({
         "context": context,
         "heuristic_decision": heuristic,
         "decision": decision,
         "ai_error": ai_error,
-        "structured_report_path": str(saved_report_path),
         "applied": applied,
         "apply_error": apply_error,
     }, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
