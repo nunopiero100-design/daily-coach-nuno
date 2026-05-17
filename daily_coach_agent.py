@@ -231,8 +231,12 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
             lines.append("Défice leve apenas se estiveres bem alimentado e sem fome/fadiga anormal.")
     elif is_planned_easy and effective_hours >= 1.25:
         lines.append("Hoje é Z2/endurance: foco em recuperação ativa e aeróbico, não intensidade.")
-        lines.append("Durante o treino: 30–45 g hidratos/h é suficiente para Z2 de ~75–120 min; água/eletrólitos se for muito fácil.")
-        lines.append("Défice leve é aceitável, mas sem sair vazio após dois dias de qualidade.")
+        if effective_hours > 2.0:
+            lines.append("Durante o treino: 40–60 g hidratos/h para Z2 longo (>2h), com água/eletrólitos suficientes.")
+            lines.append("Défice leve pode existir no dia, mas não à custa de sair vazio num treino longo.")
+        else:
+            lines.append("Durante o treino: 30–45 g hidratos/h é suficiente para Z2 de ~75–120 min; água/eletrólitos se for muito fácil.")
+            lines.append("Défice leve é aceitável, mas sem sair vazio após dois dias de qualidade.")
     elif is_quality:
         lines.append("Hoje há qualidade/intensidade: não fazer défice agressivo; alimentar bem antes e depois.")
         if planned_hours >= 1.0:
@@ -749,6 +753,14 @@ Regras específicas:
    - Não sugerir tempo, sweet spot, threshold ou blocos quando o treino planeado do dia é Z2/endurance.
    - Se houver qualidade nos dias anteriores, reforçar que hoje é para absorver carga e manter HR/RPE baixos.
    - Fueling para Z2 75–120 min: normalmente 30–45 g hidratos/h, não 60–80 g/h obrigatório.
+   - Fueling para Z2 longo acima de 2h: normalmente 40–60 g hidratos/h + água/eletrólitos suficientes.
+
+12. Regra AMARELO forte para treino longo/de qualidade:
+   - Se ontem foi FEITO MAS MAIS DURO/acima do planeado e hoje há treino longo/de qualidade (>=150 TSS, >=2h30, Sweet Spot Group Ride, Group Ride ou similar), com HRV baixa e/ou Form <= -10:
+     Estado deve ser AMARELO.
+     Não recomendar "reduzir 3%" nem "cortar um bloco" como plano principal.
+     Plano principal deve ser substituir por 90–120 min Z2 fácil/endurance, sem blocos, ou descanso se houver fadiga.
+   - Group ride em AMARELO forte só é aceitável se o atleta conseguir ficar em Z2 e cortar cedo.
 
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
@@ -880,6 +892,48 @@ Se estiveres inseguro, sê conservador.
         return None, f"Erro OpenAI: {e}; usei regras heurísticas."
 
 
+def yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_quality):
+    """
+    Identifica dias em que AMARELO deve ser AMARELO forte:
+    - treino planeado longo/duro de qualidade;
+    - ontem acima do planeado;
+    - readiness comprometida (Form negativo ou HRV baixa).
+    Nestes casos o plano não deve ser "menos 3%"; deve virar Z2/recovery.
+    """
+    y = context.get("yesterday", {}).get("compliance", {}) or {}
+    y_status = str(y.get("status") or "").upper()
+    y_ratio = y.get("ratio")
+    y_done_load = y.get("done_load") or 0
+    y_planned_load = y.get("planned_load") or 0
+
+    tm = context.get("today_metrics", {}) or {}
+    base = context.get("baseline_14d", {}) or {}
+    hrv_now = tm.get("hrv")
+    hrv_base = base.get("hrv")
+    form_now = tm.get("form")
+
+    hrv_low = bool(hrv_now is not None and hrv_base and hrv_now < hrv_base * 0.96)
+    form_negative = bool(form_now is not None and form_now <= -10)
+
+    yesterday_hard = (
+        "MAIS DURO" in y_status
+        or (y_ratio is not None and y_ratio >= 1.20)
+        or (y_done_load >= 130 and y_planned_load >= 60)
+    )
+
+    long_quality_today = (
+        is_quality
+        and (
+            planned_load >= 150
+            or planned_hours >= 2.5
+            or any(t in lname for t in ["group ride", "sweet spot group", "ride: 3", "ride 3", "3 hours", "3h"])
+        )
+    )
+
+    return long_quality_today and yesterday_hard and (hrv_low or form_negative)
+
+
+
 def normalize_practical_actions(decision, context):
     """
     Forca alternativas praticas coerentes, porque o modelo pode errar contas de duracao.
@@ -916,6 +970,10 @@ def normalize_practical_actions(decision, context):
     is_planned_easy = any(t in lname for t in easy_terms)
     is_quality = (any(t in lname for t in quality_terms) or planned_load >= 65) and not is_planned_easy
     is_easy = is_planned_easy or (planned_load <= 45 and not is_quality)
+    amarelo_forte_long_quality = (
+        status == "AMARELO"
+        and yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_quality)
+    )
 
     long_or_social_weekend = planned_hours > 2.05 or any(t in lname for t in ["social", "group ride", "long", "longo", "endurance ride", "ride 3h", "ride 4h", "ride 5h"])
 
@@ -926,11 +984,23 @@ def normalize_practical_actions(decision, context):
         weekend_alt = "Se for sábado/domingo e não der para sair: descanso total ou 45–60 min rolo muito fácil; nada de intensidade."
         weekend_weather = "Se chover/condições forem más: não forces a saída; descanso total ou recovery muito leve."
     elif status == "AMARELO":
-        a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
-        a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
-        indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
-        weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
-        weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
+        if amarelo_forte_long_quality:
+            decision["decision_text"] = "AMARELO forte: não fazer o treino longo/de qualidade como planeado; substituir por Z2 fácil/endurance controlado."
+            extra_reasons = decision.setdefault("reasons", [])
+            msg = "Treino longo/de qualidade planeado após dia acima do planeado e readiness comprometida; reduzir para Z2, não apenas -3%."
+            if msg not in extra_reasons:
+                extra_reasons.append(msg)
+            a60 = "Se só tiveres 60 min: 60 min Z2/recovery muito fácil, HR controlada, sem blocos."
+            a45 = "Se só tiveres 45 min: 45 min recovery muito fácil ou descanso total."
+            indoor = "Se for indoor/rolo: Z2 fácil/recovery; sem tempo, sem sweet spot, sem perseguir watts."
+            weekend_alt = "Se for sábado/domingo e não der para sair ou se o treino planeado for demasiado pesado: 90–120 min Z2 fácil/endurance, sem blocos e sem perseguir TSS."
+            weekend_weather = f"Se chover/condições forem más: não tentar salvar {name or 'o treino planeado'}; fazer 90–120 min Z2 fácil ou descanso."
+        else:
+            a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
+            indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
+            weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
+            weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
     else:
         if is_easy:
             a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
@@ -966,10 +1036,19 @@ def normalize_practical_actions(decision, context):
         ):
             return True
 
+        if amarelo_forte_long_quality and (
+            "reduzir" in s or "-3" in s or "3%" in s or "eliminar um bloco" in s or "cortar um bloco" in s
+            or "sweet spot group ride" in s or "group ride" in s
+        ):
+            return True
+
         return False
 
     cleaned = [a for a in actions if not replaceable(a)]
-    if not any(str(a).lower().startswith("plano normal") for a in cleaned):
+    if amarelo_forte_long_quality:
+        cleaned = [a for a in cleaned if not str(a).lower().startswith("plano normal")]
+        cleaned.insert(0, "Plano normal ajustado: não fazer o treino longo/de qualidade como planeado; fazer 90–120 min Z2 fácil/endurance, sem blocos, ou descanso se as pernas estiverem pesadas.")
+    elif not any(str(a).lower().startswith("plano normal") for a in cleaned):
         if planned:
             cleaned.insert(0, f"Plano normal: fazer {name} conforme planeado, sem acrescentar carga.")
         else:
@@ -981,6 +1060,8 @@ def normalize_practical_actions(decision, context):
         a45 = "Se quiseres rolar 45 min: recovery muito fácil ou descanso total."
         indoor = "Se for indoor/rolo: rolar muito fácil com boa ventilação; não transformar descanso em treino."
 
+    if is_weekend and is_easy and planned_hours > 2.05:
+        cleaned.append("Se 2h30 não encaixar no sábado: 2h Z2 bem feitas são válidas; manter HR/RPE baixos e não perseguir TSS.")
     cleaned.append(a60)
     cleaned.append(a45)
     cleaned.append(indoor)
