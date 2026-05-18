@@ -177,6 +177,16 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
     done_load = done_today_summary.get("load") or 0
     done_hours = done_today_summary.get("hours") or 0
 
+    yesterday = context.get("yesterday", {}) or {}
+    y_comp = yesterday.get("compliance", {}) or {}
+    y_done_load = y_comp.get("done_load") or 0
+    y_done_hours = y_comp.get("done_hours") or 0
+    y_status = str(y_comp.get("status") or "").upper()
+    recent_3d = context.get("recent_3d", {}) or {}
+    recent_load_3d = recent_3d.get("load") or 0
+    big_yesterday = y_done_load >= 150 or y_done_hours >= 3.0 or "MAIS DURO" in y_status
+    high_recent_load = recent_load_3d >= 300
+
     planned_load = sum((e.get("load") or 0) for e in planned)
     planned_hours = sum((e.get("hours") or 0) for e in planned)
     names = " ".join(str(e.get("name") or "") for e in planned).lower()
@@ -246,7 +256,11 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
         lines.append("Treino longo/endurance: 40–70 g hidratos/h conforme intensidade; não acabar vazio.")
         lines.append("Défice leve apenas se a recuperação estiver boa.")
     elif is_rest_or_easy:
-        lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
+        if big_yesterday or high_recent_load:
+            lines.append("Dia de descanso após carga alta: foco em recuperação, não em cortar hidratos agressivamente.")
+            lines.append("Défice no máximo leve; manter proteína alta, hidratação/eletrólitos e hidratos moderados para repor glicogénio.")
+        else:
+            lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
     else:
         lines.append("Dia moderado: défice leve, sem cortar demasiado os hidratos pré/pós treino.")
 
@@ -407,7 +421,10 @@ def compliance_check(planned_events, done_activities):
             interpretation = "Carga acima do planeado. Observar readiness antes de manter intensidade nos dias seguintes."
         elif ratio >= 0.85 and duration_ratio >= 0.80:
             status = "CUMPRIDO"
-            interpretation = "Treino cumprido dentro de margem normal."
+            if ratio >= 1.08 or duration_ratio >= 1.12:
+                interpretation = "Treino cumprido, mas com carga/duração acima do planeado. Não compensar; observar recuperação no dia seguinte."
+            else:
+                interpretation = "Treino cumprido dentro de margem normal."
         # Weekend practical logic:
         # - Saturday for Nuno is usually max 2h; 75-90min indoor can be a valid shorter version only if it was actually shorter.
         # - Sunday is social/free; 90min indoor quality is a valid substitute if outdoor/social fails.
@@ -762,6 +779,13 @@ Regras específicas:
      Plano principal deve ser substituir por 90–120 min Z2 fácil/endurance, sem blocos, ou descanso se houver fadiga.
    - Group ride em AMARELO forte só é aceitável se o atleta conseguir ficar em Z2 e cortar cedo.
 
+13. Regra pós-treino grande:
+   - Se ontem teve >=150 TSS, >=3h ou foi acima do planeado, e hoje não há treino planeado:
+     recomendar descanso total preferencial; no máximo 30–60 min recovery muito fácil.
+     Não sugerir hidratos baixos/agressivos; recuperação primeiro.
+     Défice calórico, se existir, deve ser no máximo leve, com hidratos moderados, proteína alta, hidratação e eletrólitos.
+   - Se treino foi cumprido mas >8% acima em carga ou >12% acima em duração, dizer "cumprido, mas acima do planeado", não apenas "dentro da margem normal".
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -1055,10 +1079,23 @@ def normalize_practical_actions(decision, context):
             cleaned.insert(0, "Plano normal: descanso total preferencial; se quiseres pedalar, Z2 muito fácil, sem blocos.")
 
     no_planned_workout = not planned or planned_load <= 5
+    y = context.get("yesterday", {}).get("compliance", {}) or {}
+    y_done_load = y.get("done_load") or 0
+    y_done_hours = y.get("done_hours") or 0
+    y_status = str(y.get("status") or "").upper()
+    recent_load_3d = (context.get("recent_3d", {}) or {}).get("load") or 0
+    big_yesterday = y_done_load >= 150 or y_done_hours >= 3.0 or "MAIS DURO" in y_status
+    high_recent_load = recent_load_3d >= 300
     if no_planned_workout:
-        a60 = "Se quiseres rolar 60 min: Z2 muito fácil/recovery, HR controlada, sem blocos."
-        a45 = "Se quiseres rolar 45 min: recovery muito fácil ou descanso total."
-        indoor = "Se for indoor/rolo: rolar muito fácil com boa ventilação; não transformar descanso em treino."
+        if big_yesterday or high_recent_load:
+            decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil conforme sensação."
+            a60 = "Se quiseres mesmo rolar 60 min: só recovery/Z1-Z2 muito fácil, HR baixa, sem blocos."
+            a45 = "Se quiseres rolar 45 min: recovery muito fácil; descanso total também é excelente."
+            indoor = "Se for indoor/rolo: soltar pernas muito fácil; não transformar recuperação em treino."
+        else:
+            a60 = "Se quiseres rolar 60 min: Z2 muito fácil/recovery, HR controlada, sem blocos."
+            a45 = "Se quiseres rolar 45 min: recovery muito fácil ou descanso total."
+            indoor = "Se for indoor/rolo: rolar muito fácil com boa ventilação; não transformar descanso em treino."
 
     if is_weekend and is_easy and planned_hours > 2.05:
         cleaned.append("Se 2h30 não encaixar no sábado: 2h Z2 bem feitas são válidas; manter HR/RPE baixos e não perseguir TSS.")
@@ -1079,7 +1116,9 @@ def normalize_practical_actions(decision, context):
         if not ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
     ]
 
-    if recovery_lines:
+    if no_planned_workout and (big_yesterday or high_recent_load):
+        recovery = "Recuperação/fueling: após carga alta, não fazer défice agressivo; proteína 150–170 g, hidratos moderados, hidratação e eletrólitos."
+    elif recovery_lines:
         recovery = recovery_lines[0]
     else:
         recovery = "Recuperação/fueling: comer e hidratar de acordo com a sessão; não fazer défice agressivo em dia de qualidade."
