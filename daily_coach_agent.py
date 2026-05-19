@@ -819,6 +819,7 @@ Regras específicas:
      today_metrics.readiness_fatigue_atl
      today_metrics.readiness_form
    - Se today_metrics.metrics_are_projected_after_planned for true, não uses CTL/ATL/Form reportados como motivo principal para reduzir.
+   - Não cites valores CTL/ATL/Form reportados/projetados nos motivos; cita apenas os valores pré-treino usados.
    - Se reduzires, baseia a decisão em readiness pré-treino, HRV, RHR, sono, carga real recente e compliance de ontem.
    - Menciona que usaste os valores pré-treino quando os valores reportados estiverem projetados.
 
@@ -991,6 +992,52 @@ def yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_qua
     )
 
     return long_quality_today and yesterday_hard and (hrv_low or form_negative)
+
+
+
+def normalize_projected_metric_reasons(decision, context):
+    """
+    When Intervals metrics are projected with today's planned workout, do not let
+    OpenAI reasons use reported CTL/ATL/Form as if they were pre-workout readiness.
+    Keep the decision, but clean the explanation and add deterministic wording
+    with the pre-workout values used.
+    """
+    tm = context.get("today_metrics", {}) or {}
+    if not tm.get("metrics_are_projected_after_planned"):
+        return decision
+
+    reasons = list(decision.get("reasons") or [])
+    cleaned = []
+    for r in reasons:
+        s = str(r)
+        low = s.lower()
+
+        mentions_projected_metrics = any(k in low for k in [
+            "fatigue_atl", "fatigue/atl", "atl",
+            "fitness_ctl", "fitness/ctl", "ctl",
+            "form real", "form report", "form projet", "form projetado",
+            "readiness_form", "readiness fatigue", "readiness_fatigue",
+        ])
+
+        # Remove reasons that mix reported/projected values or raw variable names.
+        if mentions_projected_metrics and any(k in low for k in [
+            "report", "projet", "81.", "82.", "67.", "readiness_form", "fatigue_atl"
+        ]):
+            continue
+
+        cleaned.append(s)
+
+    replacement_reason = (
+        "Valores CTL/ATL/Form reportados podem incluir o treino planeado de hoje; "
+        f"para readiness pré-treino usei CTL {fmt(tm.get('readiness_fitness_ctl'),0)}, "
+        f"ATL {fmt(tm.get('readiness_fatigue_atl'),0)} e Form {fmt(tm.get('readiness_form'),0)}."
+    )
+
+    if replacement_reason not in cleaned:
+        cleaned.insert(0, replacement_reason)
+
+    decision["reasons"] = cleaned[:5]
+    return decision
 
 
 
@@ -1547,6 +1594,7 @@ def main():
         if ai_error:
             decision.setdefault("reasons", []).append(ai_error)
 
+    decision = normalize_projected_metric_reasons(decision, context)
     decision = normalize_practical_actions(decision, context)
 
     applied = False
