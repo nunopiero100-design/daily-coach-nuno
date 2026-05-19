@@ -300,7 +300,7 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
     else:
         lines.append("Dia moderado: défice leve, sem cortar demasiado os hidratos pré/pós treino.")
 
-    lines.append("Se HRV/sono piorarem ou a potência cair, não apertar dieta: primeiro recuperar.")
+    lines.append("Nos próximos relatórios, se HRV/sono baixarem ou potência/RPE ficarem anormais, reduzir défice e priorizar recuperação.")
     return lines
 
 
