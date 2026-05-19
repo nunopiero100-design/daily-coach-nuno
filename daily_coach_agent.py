@@ -148,6 +148,19 @@ def form(w):
     return None
 
 
+def pre_workout_form(today_w, yesterday_w, planned_load_today, has_done_today):
+    """
+    Intervals.icu may expose Fitness/Fatigue/Form for the date including planned workouts.
+    If there is a planned workout today but no completed activity yet, the reported
+    Form can be a post-planned-load projection rather than true pre-workout readiness.
+    """
+    today_form = form(today_w)
+    yesterday_form = form(yesterday_w) if yesterday_w else None
+    if not has_done_today and planned_load_today and planned_load_today > 0 and yesterday_form is not None:
+        return yesterday_form
+    return today_form
+
+
 def load(item):
     return fnum(first(item, ["icu_training_load", "training_load", "load", "tss", "TSS"]))
 
@@ -586,7 +599,7 @@ def choose_replacement_kind(status, planned_name):
     return "yellow_endurance"
 
 
-def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance):
+def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=None):
     reasons, actions = [], []
     score = 0
 
@@ -625,7 +638,7 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
         else:
             reasons.append(f"Sono ok: {fmt_h(sh)}.")
 
-    fm = form(today_w)
+    fm = readiness_form if readiness_form is not None else form(today_w)
     if fm is not None:
         if fm < -30:
             score += 3; reasons.append(f"Form muito negativa: {fmt(fm,0)}.")
@@ -785,6 +798,12 @@ Regras específicas:
      Não sugerir hidratos baixos/agressivos; recuperação primeiro.
      Défice calórico, se existir, deve ser no máximo leve, com hidratos moderados, proteína alta, hidratação e eletrólitos.
    - Se treino foi cumprido mas >8% acima em carga ou >12% acima em duração, dizer "cumprido, mas acima do planeado", não apenas "dentro da margem normal".
+
+14. Regra Form/TSB pré-treino:
+   - Se há treino planeado hoje e ainda não há atividade concluída hoje, a Form/TSB reportada pelo Intervals pode incluir o treino planeado de hoje.
+   - Para decidir readiness antes do treino, usa today_metrics.readiness_form.
+   - Se today_metrics.form_is_projected_after_planned for true, não uses a Form reportada como motivo principal para reduzir; menciona que foi usada a Form pré-treino.
+   - HRV, RHR, sono, carga real recente e compliance de ontem continuam a ser sinais principais.
 
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
@@ -1340,6 +1359,7 @@ def main():
             by_day[d] = w
 
     today_w = by_day.get(target, {})
+    yesterday_w = by_day.get(yesterday, {})
     prev14 = [by_day[d] for d in [target - dt.timedelta(days=i) for i in range(1, 15)] if d in by_day]
     prev7 = [by_day[d] for d in [target - dt.timedelta(days=i) for i in range(1, 8)] if d in by_day]
     baseline = {
@@ -1366,6 +1386,9 @@ def main():
     planned_loads = [load(e) for e in today_events if load(e) is not None]
     planned_load = sum(planned_loads) if planned_loads else None
 
+    reported_form_today = form(today_w)
+    readiness_form = pre_workout_form(today_w, yesterday_w, planned_load, bool(done_today))
+
     context = {
         "date": target.isoformat(),
         "athlete": {"id": athlete.get("id"), "name": athlete.get("name")},
@@ -1377,7 +1400,9 @@ def main():
             "weight_kg": weight_kg(today_w),
             "fitness_ctl": ctl(today_w),
             "fatigue_atl": atl(today_w),
-            "form": form(today_w),
+            "form": reported_form_today,
+            "readiness_form": readiness_form,
+            "form_is_projected_after_planned": bool(planned_load and planned_load > 0 and not done_today and readiness_form != reported_form_today),
         },
         "baseline_14d": baseline,
         "recent_3d": {"load": recent_load, "hours": recent_hours},
@@ -1442,7 +1467,7 @@ def main():
         weight_avg_7d=context["baseline_14d"].get("weight_7d"),
     )
 
-    heuristic = heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance)
+    heuristic = heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=readiness_form)
 
     if missing_today_metrics:
         decision = {
@@ -1553,7 +1578,12 @@ def main():
     lines.append(f"- HRV: {fmt(tm.get('hrv'))} | baseline 14d: {fmt(bl.get('hrv'))}")
     lines.append(f"- Resting HR: {fmt(tm.get('resting_hr'),0)} bpm | baseline 14d: {fmt(bl.get('rhr'),0)} bpm")
     lines.append(f"- Peso: {fmt(tm.get('weight_kg'),1)} kg | média 7d: {fmt(bl.get('weight_7d'),1)} kg | objetivo: 74,0 kg")
-    lines.append(f"- Fitness/CTL: {fmt(tm.get('fitness_ctl'),0)} | Fatigue/ATL: {fmt(tm.get('fatigue_atl'),0)} | Form: {fmt(tm.get('form'),0)}")
+    form_line = f"- Fitness/CTL: {fmt(tm.get('fitness_ctl'),0)} | Fatigue/ATL: {fmt(tm.get('fatigue_atl'),0)} | Form reportada: {fmt(tm.get('form'),0)}"
+    if tm.get("form_is_projected_after_planned"):
+        form_line += f" | Form pré-treino usada: {fmt(tm.get('readiness_form'),0)}"
+    else:
+        form_line += f" | Form usada: {fmt(tm.get('readiness_form'),0)}"
+    lines.append(form_line)
     lines.append(f"- Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
     dq = context.get("data_quality", {})
     if not dq.get("is_complete", True):
