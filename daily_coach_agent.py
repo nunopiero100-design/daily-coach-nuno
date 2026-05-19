@@ -227,8 +227,13 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
 
     effective_load = done_load if done_today else planned_load
     effective_hours = done_hours if done_today else planned_hours
-    is_planned_easy = any(t in names for t in easy_terms)
-    is_quality = (any(t in names for t in intense_terms) or effective_load >= 80) and not is_planned_easy
+    has_easy_terms = any(t in names for t in easy_terms)
+    has_quality_terms = any(t in names for t in intense_terms)
+
+    # Mixed workouts with Sweet Spot/Threshold/VO2 plus Z2 in the name are still quality.
+    is_planned_easy = has_easy_terms and not has_quality_terms
+    is_quality = has_quality_terms or (effective_load >= 80 and not is_planned_easy)
+    is_mixed_quality_easy = has_quality_terms and has_easy_terms
     is_long = effective_hours >= 2.0 or effective_load >= 100
     is_rest_or_easy = is_planned_easy or (effective_load <= 35 and not is_quality)
 
@@ -273,6 +278,11 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
         else:
             lines.append("Durante o treino: 30–45 g hidratos/h é suficiente para Z2 de ~75–120 min; água/eletrólitos se for muito fácil.")
             lines.append("Défice leve é aceitável, mas sem sair vazio após dois dias de qualidade.")
+    elif is_mixed_quality_easy:
+        lines.append("Hoje é qualidade controlada com Z2: há blocos de intensidade, mas o restante deve ficar fácil/controlado.")
+        lines.append("Durante o treino: 50–70 g hidratos/h se a sessão passar de ~75 min; usar bidão + gel/chews se necessário.")
+        lines.append("Não fazer défice agressivo; manter Z2 realmente controlado fora dos blocos.")
+        lines.append("Pós-treino: 30–40 g proteína + hidratos suficientes para recuperar.")
     elif is_quality:
         lines.append("Hoje há qualidade/intensidade: não fazer défice agressivo; alimentar bem antes e depois.")
         if planned_hours >= 1.0:
@@ -793,10 +803,15 @@ Regras específicas:
 
 11. Regra para treino Z2/endurance planeado:
    - Se o treino planeado contiver Zone 2, Z2, Endurance, Recovery ou fácil, as alternativas de 45/60 min devem continuar Z2/recovery.
-   - Não sugerir tempo, sweet spot, threshold ou blocos quando o treino planeado do dia é Z2/endurance.
+   - Não sugerir tempo, sweet spot, threshold ou blocos quando o treino planeado do dia é Z2/endurance puro.
    - Se houver qualidade nos dias anteriores, reforçar que hoje é para absorver carga e manter HR/RPE baixos.
    - Fueling para Z2 75–120 min: normalmente 30–45 g hidratos/h, não 60–80 g/h obrigatório.
    - Fueling para Z2 longo acima de 2h: normalmente 40–60 g hidratos/h + água/eletrólitos suficientes.
+
+11.b Regra treino misto qualidade + Z2:
+   - Se o treino contiver Sweet Spot, Threshold, VO2, Over-Under, Intervals ou similar, e também contiver Z2/Endurance no nome, classificar como qualidade controlada/mista, não como Z2 puro.
+   - Neste caso, manter a cautela nos blocos e Z2 realmente fácil fora deles.
+   - Fueling para treino misto >75 min: normalmente 50–70 g hidratos/h, não 30–45 g/h de Z2 puro.
 
 12. Regra AMARELO forte para treino longo/de qualidade:
    - Se ontem foi FEITO MAS MAIS DURO/acima do planeado e hoje há treino longo/de qualidade (>=150 TSS, >=2h30, Sweet Spot Group Ride, Group Ride ou similar), com HRV baixa e/ou Form <= -10:
@@ -1074,9 +1089,15 @@ def normalize_practical_actions(decision, context):
         "sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under",
         "burst", "sprint", "test", "race", "cheetah", "pounce"
     ]
-    is_planned_easy = any(t in lname for t in easy_terms)
-    is_quality = (any(t in lname for t in quality_terms) or planned_load >= 65) and not is_planned_easy
-    is_easy = is_planned_easy or (planned_load <= 45 and not is_quality)
+    has_easy_terms = any(t in lname for t in easy_terms)
+    has_quality_terms = any(t in lname for t in quality_terms)
+
+    # Quality terms override easy terms for mixed workouts like:
+    # "Sweet Spot 2 x 15 min + Z2 cap 200W".
+    # These are not pure Z2 days; they are controlled quality days.
+    is_quality = has_quality_terms or (planned_load >= 80 and not has_easy_terms)
+    is_easy = (has_easy_terms and not has_quality_terms) or (planned_load <= 45 and not is_quality)
+    is_mixed_quality_easy = has_quality_terms and has_easy_terms
     amarelo_forte_long_quality = (
         status == "AMARELO"
         and yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_quality)
