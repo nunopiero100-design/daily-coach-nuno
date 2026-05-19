@@ -148,6 +148,19 @@ def form(w):
     return None
 
 
+def pre_workout_metric(today_w, yesterday_w, getter, planned_load_today, has_done_today):
+    """
+    For CTL/ATL/Form-like metrics that may include today's planned workout in Intervals.
+    If there is a planned workout today and no activity is completed yet, use yesterday
+    as the best available pre-workout proxy.
+    """
+    today_value = getter(today_w)
+    yesterday_value = getter(yesterday_w) if yesterday_w else None
+    if not has_done_today and planned_load_today and planned_load_today > 0 and yesterday_value is not None:
+        return yesterday_value
+    return today_value
+
+
 def pre_workout_form(today_w, yesterday_w, planned_load_today, has_done_today):
     """
     Intervals.icu may expose Fitness/Fatigue/Form for the date including planned workouts.
@@ -799,11 +812,15 @@ Regras específicas:
      Défice calórico, se existir, deve ser no máximo leve, com hidratos moderados, proteína alta, hidratação e eletrólitos.
    - Se treino foi cumprido mas >8% acima em carga ou >12% acima em duração, dizer "cumprido, mas acima do planeado", não apenas "dentro da margem normal".
 
-14. Regra Form/TSB pré-treino:
-   - Se há treino planeado hoje e ainda não há atividade concluída hoje, a Form/TSB reportada pelo Intervals pode incluir o treino planeado de hoje.
-   - Para decidir readiness antes do treino, usa today_metrics.readiness_form.
-   - Se today_metrics.form_is_projected_after_planned for true, não uses a Form reportada como motivo principal para reduzir; menciona que foi usada a Form pré-treino.
-   - HRV, RHR, sono, carga real recente e compliance de ontem continuam a ser sinais principais.
+14. Regra CTL/ATL/Form pré-treino:
+   - Se há treino planeado hoje e ainda não há atividade concluída hoje, a Fitness/CTL, Fatigue/ATL e Form/TSB reportadas pelo Intervals podem incluir o treino planeado de hoje.
+   - Para decidir readiness antes do treino, usa:
+     today_metrics.readiness_fitness_ctl
+     today_metrics.readiness_fatigue_atl
+     today_metrics.readiness_form
+   - Se today_metrics.metrics_are_projected_after_planned for true, não uses CTL/ATL/Form reportados como motivo principal para reduzir.
+   - Se reduzires, baseia a decisão em readiness pré-treino, HRV, RHR, sono, carga real recente e compliance de ontem.
+   - Menciona que usaste os valores pré-treino quando os valores reportados estiverem projetados.
 
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
@@ -1386,8 +1403,21 @@ def main():
     planned_loads = [load(e) for e in today_events if load(e) is not None]
     planned_load = sum(planned_loads) if planned_loads else None
 
+    reported_fitness_today = ctl(today_w)
+    reported_fatigue_today = atl(today_w)
     reported_form_today = form(today_w)
+
+    readiness_fitness = pre_workout_metric(today_w, yesterday_w, ctl, planned_load, bool(done_today))
+    readiness_fatigue = pre_workout_metric(today_w, yesterday_w, atl, planned_load, bool(done_today))
     readiness_form = pre_workout_form(today_w, yesterday_w, planned_load, bool(done_today))
+
+    metrics_projected_after_planned = bool(
+        planned_load and planned_load > 0 and not done_today and (
+            readiness_form != reported_form_today
+            or readiness_fatigue != reported_fatigue_today
+            or readiness_fitness != reported_fitness_today
+        )
+    )
 
     context = {
         "date": target.isoformat(),
@@ -1398,11 +1428,16 @@ def main():
             "hrv": hrv(today_w),
             "resting_hr": rhr(today_w),
             "weight_kg": weight_kg(today_w),
-            "fitness_ctl": ctl(today_w),
-            "fatigue_atl": atl(today_w),
+            "fitness_ctl": reported_fitness_today,
+            "fatigue_atl": reported_fatigue_today,
             "form": reported_form_today,
+            "readiness_fitness_ctl": readiness_fitness,
+            "readiness_fatigue_atl": readiness_fatigue,
             "readiness_form": readiness_form,
+            "metrics_are_projected_after_planned": metrics_projected_after_planned,
             "form_is_projected_after_planned": bool(planned_load and planned_load > 0 and not done_today and readiness_form != reported_form_today),
+            "fatigue_is_projected_after_planned": bool(planned_load and planned_load > 0 and not done_today and readiness_fatigue != reported_fatigue_today),
+            "fitness_is_projected_after_planned": bool(planned_load and planned_load > 0 and not done_today and readiness_fitness != reported_fitness_today),
         },
         "baseline_14d": baseline,
         "recent_3d": {"load": recent_load, "hours": recent_hours},
@@ -1578,12 +1613,18 @@ def main():
     lines.append(f"- HRV: {fmt(tm.get('hrv'))} | baseline 14d: {fmt(bl.get('hrv'))}")
     lines.append(f"- Resting HR: {fmt(tm.get('resting_hr'),0)} bpm | baseline 14d: {fmt(bl.get('rhr'),0)} bpm")
     lines.append(f"- Peso: {fmt(tm.get('weight_kg'),1)} kg | média 7d: {fmt(bl.get('weight_7d'),1)} kg | objetivo: 74,0 kg")
-    form_line = f"- Fitness/CTL: {fmt(tm.get('fitness_ctl'),0)} | Fatigue/ATL: {fmt(tm.get('fatigue_atl'),0)} | Form reportada: {fmt(tm.get('form'),0)}"
-    if tm.get("form_is_projected_after_planned"):
-        form_line += f" | Form pré-treino usada: {fmt(tm.get('readiness_form'),0)}"
+    if tm.get("metrics_are_projected_after_planned"):
+        lines.append(
+            f"- Fitness/CTL reportada: {fmt(tm.get('fitness_ctl'),0)} | pré-treino usada: {fmt(tm.get('readiness_fitness_ctl'),0)}"
+            f" | Fatigue/ATL reportada: {fmt(tm.get('fatigue_atl'),0)} | pré-treino usada: {fmt(tm.get('readiness_fatigue_atl'),0)}"
+            f" | Form reportada: {fmt(tm.get('form'),0)} | pré-treino usada: {fmt(tm.get('readiness_form'),0)}"
+        )
     else:
-        form_line += f" | Form usada: {fmt(tm.get('readiness_form'),0)}"
-    lines.append(form_line)
+        lines.append(
+            f"- Fitness/CTL: {fmt(tm.get('fitness_ctl'),0)}"
+            f" | Fatigue/ATL: {fmt(tm.get('fatigue_atl'),0)}"
+            f" | Form usada: {fmt(tm.get('readiness_form'),0)}"
+        )
     lines.append(f"- Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
     dq = context.get("data_quality", {})
     if not dq.get("is_complete", True):
