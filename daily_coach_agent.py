@@ -292,11 +292,18 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
         lines.append("Treino longo/endurance: 40–70 g hidratos/h conforme intensidade; não acabar vazio.")
         lines.append("Défice leve apenas se a recuperação estiver boa.")
     elif is_rest_or_easy:
+        has_planned_easy_workout = planned_load > 5 or planned_hours > 0
         if big_yesterday or high_recent_load:
-            lines.append("Dia de descanso após carga alta: foco em recuperação, não em cortar hidratos agressivamente.")
+            if has_planned_easy_workout:
+                lines.append("Dia fácil/Z2 após carga alta: foco em recuperação ativa e aeróbico leve, não em cortar hidratos agressivamente.")
+            else:
+                lines.append("Dia de descanso após carga alta: foco em recuperação, não em cortar hidratos agressivamente.")
             lines.append("Défice no máximo leve; manter proteína alta, hidratação/eletrólitos e hidratos moderados para repor glicogénio.")
         else:
-            lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
+            if has_planned_easy_workout:
+                lines.append("Dia fácil/Z2: défice leve aceitável, mas manter energia suficiente para cumprir o treino sem arrastar.")
+            else:
+                lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
     else:
         lines.append("Dia moderado: défice leve, sem cortar demasiado os hidratos pré/pós treino.")
 
@@ -823,7 +830,7 @@ Regras específicas:
 13. Regra pós-treino grande:
    - Se ontem teve >=150 TSS, >=3h ou foi acima do planeado, e hoje não há treino planeado:
      recomendar descanso total preferencial; no máximo 30–60 min recovery muito fácil.
-     Não sugerir hidratos baixos/agressivos; recuperação primeiro.
+     Não sugerir hidratos baixos/agressivos; recuperação primeiro. Se houver Z2/fácil planeado, chamar "dia fácil/Z2", não "descanso".
      Défice calórico, se existir, deve ser no máximo leve, com hidratos moderados, proteína alta, hidratação e eletrólitos.
    - Se treino foi cumprido mas >8% acima em carga ou >12% acima em duração, dizer "cumprido, mas acima do planeado", não apenas "dentro da margem normal".
 
