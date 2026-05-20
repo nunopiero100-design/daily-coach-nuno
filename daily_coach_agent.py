@@ -815,6 +815,11 @@ Regras específicas:
    - Fueling para Z2 75–120 min: normalmente 30–45 g hidratos/h, não 60–80 g/h obrigatório.
    - Fueling para Z2 longo acima de 2h: normalmente 40–60 g hidratos/h + água/eletrólitos suficientes.
 
+11.a Regra Z2 puro curto:
+   - Se o treino planeado é Z2/recovery/endurance puro, curto (até ~75 min), e HRV/RHR/sono estão bons, não marcar AMARELO apenas por Form/carga acumulada.
+   - O estado deve ser VERDE para cumprir Z2 fácil.
+   - Mesmo se o estado for AMARELO, as ações devem continuar Z2/recovery, nunca tempo/SS/threshold.
+
 11.b Regra treino misto qualidade + Z2:
    - Se o treino contiver Sweet Spot, Threshold, VO2, Over-Under, Intervals ou similar, e também contiver Z2/Endurance no nome, classificar como qualidade controlada/mista, não como Z2 puro.
    - Neste caso, manter a cautela nos blocos e Z2 realmente fácil fora deles.
@@ -844,6 +849,10 @@ Regras específicas:
    - Não cites valores CTL/ATL/Form reportados/projetados nos motivos; cita apenas os valores pré-treino usados.
    - Se reduzires, baseia a decisão em readiness pré-treino, HRV, RHR, sono, carga real recente e compliance de ontem.
    - Menciona que usaste os valores pré-treino quando os valores reportados estiverem projetados.
+
+15. Regra consistência com compliance de ontem:
+   - Se yesterday.compliance.status for CUMPRIDO e a leitura disser "dentro de margem normal", não digas que ontem foi acima do planeado, mais duro, excesso ou ligeiramente acima.
+   - Se precisares justificar cautela, usa carga acumulada recente, readiness pré-treino ou sequência semanal, não um excesso que não existiu.
 
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
@@ -1017,6 +1026,119 @@ def yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_qua
 
 
 
+def normalize_yesterday_compliance_reasons(decision, context):
+    """
+    Ensure OpenAI reasons don't contradict deterministic yesterday compliance.
+    If yesterday was completed within normal margin, remove wording saying it was
+    above planned / harder than planned.
+    """
+    y = context.get("yesterday", {}).get("compliance", {}) or {}
+    y_status = str(y.get("status") or "").upper()
+    y_interp = str(y.get("interpretation") or "").lower()
+    y_ratio = y.get("ratio")
+
+    yesterday_normal_completed = (
+        y_status == "CUMPRIDO"
+        and "acima" not in y_interp
+        and "mais duro" not in y_interp
+        and (y_ratio is None or y_ratio < 1.08)
+    )
+
+    if not yesterday_normal_completed:
+        return decision
+
+    reasons = list(decision.get("reasons") or [])
+    cleaned = []
+    removed = False
+
+    bad_markers = [
+        "ontem", "yesterday"
+    ]
+    contradiction_markers = [
+        "acima", "mais duro", "ligeiramente acima", "above", "harder", "excesso"
+    ]
+
+    for r in reasons:
+        s = str(r)
+        low = s.lower()
+        if any(m in low for m in bad_markers) and any(m in low for m in contradiction_markers):
+            removed = True
+            continue
+        cleaned.append(s)
+
+    if removed:
+        replacement = "Ontem o treino ajustado foi cumprido dentro da margem; a cautela vem da carga acumulada recente, não de excesso ontem."
+        if replacement not in cleaned:
+            cleaned.insert(0, replacement)
+
+    decision["reasons"] = cleaned[:5]
+    return decision
+
+
+
+def normalize_pure_easy_day_decision(decision, context):
+    """
+    Pure Z2/recovery days are meant to absorb load.
+    If OpenAI returns AMARELO for a short pure Z2 workout only because recent load/Form is high,
+    the practical prescription must remain Z2/recovery, not tempo/SS blocks.
+    Also, if HRV/RHR/sleep are good and the planned workout is short/easy, keep VERDE.
+    """
+    planned = context.get("planned_events_today", [])
+    if not planned:
+        return decision
+
+    e = planned[0]
+    name = str(e.get("name") or "").lower()
+    planned_load = e.get("load") or 0
+    planned_hours = e.get("hours") or 0
+
+    easy_terms = ["zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"]
+    quality_terms = ["sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under", "burst", "sprint", "test", "race", "cheetah", "pounce"]
+
+    is_pure_easy = any(t in name for t in easy_terms) and not any(t in name for t in quality_terms)
+    if not is_pure_easy:
+        return decision
+
+    tm = context.get("today_metrics", {}) or {}
+    bl = context.get("baseline_14d", {}) or {}
+    hrv_now = tm.get("hrv")
+    hrv_base = bl.get("hrv")
+    rhr_now = tm.get("resting_hr")
+    rhr_base = bl.get("rhr")
+    sleep_hours = tm.get("sleep_hours")
+    readiness_form = tm.get("readiness_form")
+
+    hrv_good = hrv_now is not None and hrv_base and hrv_now >= hrv_base * 0.95
+    rhr_good = rhr_now is not None and rhr_base and rhr_now <= rhr_base + 2
+    sleep_good = sleep_hours is not None and sleep_hours >= 7.0
+    short_easy = planned_hours <= 1.25 and planned_load <= 60
+
+    # For short Z2 with good readiness, do not turn the day AMARELO just because
+    # recent load/Form is still carrying accumulated training stress.
+    if decision.get("status") == "AMARELO" and short_easy and hrv_good and rhr_good and sleep_good:
+        decision["status"] = "VERDE"
+        decision["decision_text"] = "Manter o treino Z2 planeado; fazer fácil e sem acrescentar intensidade."
+        reasons = [
+            "Treino planeado é Z2 puro e curto; objetivo é absorver carga, não criar novo estímulo.",
+            "HRV, RHR e sono estão bons para cumprir Z2 fácil.",
+            f"Form pré-treino {fmt(readiness_form,0)} reflete carga acumulada, mas não justifica cortar um Z2 curto; apenas manter RPE/HR baixos."
+        ]
+        decision["reasons"] = reasons
+
+    # Whether status stays AMARELO or becomes VERDE, pure Z2 actions must remain Z2/recovery.
+    if decision.get("status") in ("VERDE", "AMARELO"):
+        decision["actions"] = [
+            f"Plano normal: fazer {e.get('name') or 'o treino Z2 planeado'} com HR controlada, RPE baixo, sem blocos e sem perseguir TSS.",
+            "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos.",
+            "Se só tiveres 45 min: 45 min recovery/Z2 muito fácil ou descanso, sem blocos.",
+            "Se for indoor/rolo: fazer Z2 fácil/recovery com boa ventilação; não transformar em tempo/SS.",
+            "Recuperação/fueling: hidratação adequada; hidratos só se precisares/fores vazio, proteína suficiente no dia."
+        ]
+
+    return decision
+
+
+
 def normalize_projected_metric_reasons(decision, context):
     """
     When Intervals metrics are projected with today's planned workout, do not let
@@ -1119,7 +1241,13 @@ def normalize_practical_actions(decision, context):
         weekend_alt = "Se for sábado/domingo e não der para sair: descanso total ou 45–60 min rolo muito fácil; nada de intensidade."
         weekend_weather = "Se chover/condições forem más: não forces a saída; descanso total ou recovery muito leve."
     elif status == "AMARELO":
-        if amarelo_forte_long_quality:
+        if is_easy:
+            a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
+            a45 = "Se só tiveres 45 min: 45 min recovery/Z2 muito fácil ou descanso, sem blocos."
+            indoor = "Se for indoor/rolo: fazer Z2 fácil/recovery com boa ventilação; não transformar em tempo/SS."
+            weekend_alt = "Se for sábado/domingo e não der para sair: 60–90 min Z2/recovery muito fácil; sem intensidade."
+            weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino Z2 planeado'} indoor/rolo em Z2 fácil, sem blocos."
+        elif amarelo_forte_long_quality:
             decision["decision_text"] = "AMARELO forte: não fazer o treino longo/de qualidade como planeado; substituir por Z2 fácil/endurance controlado."
             extra_reasons = decision.setdefault("reasons", [])
             msg = "Treino longo/de qualidade planeado após dia acima do planeado e readiness comprometida; reduzir para Z2, não apenas -3%."
@@ -1622,6 +1750,8 @@ def main():
         if ai_error:
             decision.setdefault("reasons", []).append(ai_error)
 
+    decision = normalize_yesterday_compliance_reasons(decision, context)
+    decision = normalize_pure_easy_day_decision(decision, context)
     decision = normalize_projected_metric_reasons(decision, context)
     decision = normalize_practical_actions(decision, context)
 
