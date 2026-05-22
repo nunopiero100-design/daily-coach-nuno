@@ -722,6 +722,20 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
     return {"status": status, "reasons": reasons, "actions": actions, "source": "heuristic"}
 
 
+
+def get_openai_reasoning_effort(default="medium"):
+    """
+    Reasoning effort can be controlled with OPENAI_REASONING_EFFORT.
+    Useful values: minimal, low, medium, high.
+    """
+    effort = os.getenv("OPENAI_REASONING_EFFORT", default).strip().lower()
+    allowed = {"minimal", "low", "medium", "high"}
+    if effort not in allowed:
+        print(f"OPENAI_REASONING_EFFORT inválido: {effort!r}. A usar {default!r}.")
+        return default
+    return effort
+
+
 def call_openai(openai_key, model, context):
     """
     Chama a OpenAI para decisão do treinador.
@@ -920,7 +934,7 @@ Se estiveres inseguro, sê conservador.
             "instructions": instructions,
             "input": user_input,
             "max_output_tokens": 2000,
-            "reasoning": {"effort": "minimal"},
+            "reasoning": {"effort": openai_reasoning_effort},
         }
         r = requests.post(OPENAI_BASE, headers=headers, json=payload, timeout=90)
         if not r.ok:
@@ -1634,6 +1648,7 @@ def main():
     athlete_id = os.getenv("ATHLETE_ID", "0").strip() or "0"
     openai_key = os.getenv("OPENAI_API_KEY", "").strip()
     openai_model = os.getenv("OPENAI_MODEL", "gpt-5-mini").strip()
+    openai_reasoning_effort = get_openai_reasoning_effort("medium")
     auto_apply = bool_env("AUTO_APPLY", False)
 
     if not intervals_key:
