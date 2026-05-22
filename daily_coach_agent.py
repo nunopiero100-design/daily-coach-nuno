@@ -303,7 +303,11 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
             if has_planned_easy_workout:
                 lines.append("Dia fácil/Z2: défice leve aceitável, mas manter energia suficiente para cumprir o treino sem arrastar.")
             else:
-                lines.append("Dia fácil/descanso: aqui sim criar défice leve/moderado; hidratos mais baixos, proteína alta.")
+                if mild_fatigue_no_plan(context):
+                    lines.append("Dia de descanso com sinais ligeiros de fadiga: défice no máximo leve; recuperar primeiro.")
+                    lines.append("Manter proteína alta, hidratação/eletrólitos e hidratos moderados; não cortar agressivamente hoje.")
+                else:
+                    lines.append("Dia fácil/descanso: défice leve aceitável; hidratos mais baixos se energia/fome estiverem ok, proteína alta.")
     else:
         lines.append("Dia moderado: défice leve, sem cortar demasiado os hidratos pré/pós treino.")
 
@@ -854,6 +858,12 @@ Regras específicas:
    - Se yesterday.compliance.status for CUMPRIDO e a leitura disser "dentro de margem normal", não digas que ontem foi acima do planeado, mais duro, excesso ou ligeiramente acima.
    - Se precisares justificar cautela, usa carga acumulada recente, readiness pré-treino ou sequência semanal, não um excesso que não existiu.
 
+16. Regra dia sem treino com sinais ligeiros de fadiga:
+   - Se não há treino planeado hoje e HRV está ~8-10% abaixo do baseline, RHR está +3 bpm ou mais, ou sono/score está fraco, não tratar como VERDE normal.
+   - Recomendar descanso total preferencial; no máximo 30-45 min recovery muito fácil.
+   - Não sugerir 60-75 min Z2 como opção principal nestes dias.
+   - No fueling, défice no máximo leve; evitar défice agressivo e priorizar recuperação.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -1023,6 +1033,79 @@ def yellow_long_quality_risk(context, planned_load, planned_hours, lname, is_qua
     )
 
     return long_quality_today and yesterday_hard and (hrv_low or form_negative)
+
+
+
+def mild_fatigue_no_plan(context):
+    """
+    Detect a no-planned-workout day where the best coaching answer is recovery,
+    not a normal green optional Z2 day.
+    """
+    planned = context.get("planned_events_today", []) or []
+    done_today = context.get("done_today", []) or []
+    if planned or done_today:
+        return False
+
+    tm = context.get("today_metrics", {}) or {}
+    bl = context.get("baseline_14d", {}) or {}
+
+    hrv = tm.get("hrv")
+    hrv_base = bl.get("hrv")
+    rhr = tm.get("resting_hr")
+    rhr_base = bl.get("rhr")
+    sleep_score = tm.get("sleep_score")
+    sleep_hours = tm.get("sleep_hours")
+
+    hrv_low = hrv is not None and hrv_base and hrv <= hrv_base * 0.92
+    hrv_borderline = hrv is not None and hrv_base and hrv <= hrv_base * 0.95
+    rhr_high = rhr is not None and rhr_base and rhr >= rhr_base + 3
+    sleep_weak = (sleep_score is not None and sleep_score < 80) or (sleep_hours is not None and sleep_hours < 7.0)
+
+    if hrv_low and rhr_high:
+        return True
+
+    signals = sum([bool(hrv_low or hrv_borderline), bool(rhr_high), bool(sleep_weak)])
+    return signals >= 2
+
+
+def normalize_no_plan_recovery_day(decision, context):
+    """
+    If there is no planned workout and mild fatigue markers are present,
+    force recovery wording/actions. This avoids 'VERDE normal' reports when
+    the useful recommendation is rest.
+    """
+    if not mild_fatigue_no_plan(context):
+        return decision
+
+    tm = context.get("today_metrics", {}) or {}
+    bl = context.get("baseline_14d", {}) or {}
+
+    hrv = tm.get("hrv")
+    hrv_base = bl.get("hrv")
+    rhr = tm.get("resting_hr")
+    rhr_base = bl.get("rhr")
+    sleep_score = tm.get("sleep_score")
+    sleep_hours = tm.get("sleep_hours")
+
+    decision["status"] = "AMARELO"
+    decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil se quiseres mexer as pernas."
+
+    decision["reasons"] = [
+        "Não há treino planeado para hoje, por isso não há necessidade de acrescentar carga.",
+        f"HRV abaixo do habitual ({fmt(hrv,0)} vs baseline {fmt(hrv_base,1)}) e RHR acima do habitual ({fmt(rhr,0)} vs baseline {fmt(rhr_base,0)}), sinalizando recuperação incompleta.",
+        f"Sono/score mais fraco do que o habitual ({fmt(sleep_hours,1)} h; score {fmt(sleep_score,0)}), reforçando que hoje deve ser dia de absorção.",
+        "Form positiva não justifica treino extra num dia sem plano quando há sinais fisiológicos de fadiga."
+    ]
+
+    decision["actions"] = [
+        "Plano normal: descanso total preferencial.",
+        "Se quiseres mesmo rolar: 30–45 min recovery/Z1-Z2 muito fácil, HR baixa, RPE 1–2/10, sem blocos e sem perseguir TSS.",
+        "Se só tiveres 60 min: não é preciso usar os 60 min; fazer 30–45 min muito fácil ou descansar.",
+        "Se for indoor/rolo: recovery muito fácil com boa ventilação; não transformar em Z2 longo nem em intensidade.",
+        "Recuperação/fueling: défice no máximo leve; proteína alta, hidratação/eletrólitos e hidratos moderados. Evitar défice agressivo hoje."
+    ]
+
+    return decision
 
 
 
@@ -1750,6 +1833,7 @@ def main():
         if ai_error:
             decision.setdefault("reasons", []).append(ai_error)
 
+    decision = normalize_no_plan_recovery_day(decision, context)
     decision = normalize_yesterday_compliance_reasons(decision, context)
     decision = normalize_pure_easy_day_decision(decision, context)
     decision = normalize_projected_metric_reasons(decision, context)
