@@ -726,17 +726,17 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
 def get_openai_reasoning_effort(default="medium"):
     """
     Reasoning effort can be controlled with OPENAI_REASONING_EFFORT.
-    Useful values: minimal, low, medium, high.
+    Useful values: none/minimal, low, medium, high, xhigh.
     """
     effort = os.getenv("OPENAI_REASONING_EFFORT", default).strip().lower()
-    allowed = {"minimal", "low", "medium", "high"}
+    allowed = {"minimal", "none", "low", "medium", "high", "xhigh"}
     if effort not in allowed:
         print(f"OPENAI_REASONING_EFFORT inválido: {effort!r}. A usar {default!r}.")
         return default
     return effort
 
 
-def call_openai(openai_key, model, context):
+def call_openai(openai_key, model, reasoning_effort, context):
     """
     Chama a OpenAI para decisão do treinador.
 
@@ -934,7 +934,7 @@ Se estiveres inseguro, sê conservador.
             "instructions": instructions,
             "input": user_input,
             "max_output_tokens": 2000,
-            "reasoning": {"effort": openai_reasoning_effort},
+            "reasoning": {"effort": reasoning_effort},
         }
         r = requests.post(OPENAI_BASE, headers=headers, json=payload, timeout=90)
         if not r.ok:
@@ -953,7 +953,7 @@ Se estiveres inseguro, sê conservador.
                 {"role": "user", "content": user_input},
             ],
             "max_completion_tokens": 2000,
-            "reasoning_effort": "minimal",
+            "reasoning_effort": reasoning_effort,
         }
         r = requests.post(CHAT_COMPLETIONS_BASE, headers=headers, json=payload, timeout=90)
         if not r.ok:
@@ -1423,7 +1423,12 @@ def normalize_practical_actions(decision, context):
     big_yesterday = y_done_load >= 150 or y_done_hours >= 3.0 or "MAIS DURO" in y_status
     high_recent_load = recent_load_3d >= 300
     if no_planned_workout:
-        if big_yesterday or high_recent_load:
+        if mild_fatigue_no_plan(context):
+            decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil se quiseres mexer as pernas."
+            a60 = "Se tiveres 60 min disponíveis: não é preciso usar os 60; faz 30–45 min recovery muito fácil ou descansa."
+            a45 = "Se quiseres rolar 45 min: recovery/Z1-Z2 muito fácil, HR baixa, RPE 1–2/10, sem blocos."
+            indoor = "Se for indoor/rolo: recovery muito fácil com boa ventilação; não transformar em Z2 longo nem em intensidade."
+        elif big_yesterday or high_recent_load:
             decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil conforme sensação."
             a60 = "Se quiseres mesmo rolar 60 min: só recovery/Z1-Z2 muito fácil, HR baixa, sem blocos."
             a45 = "Se quiseres rolar 45 min: recovery muito fácil; descanso total também é excelente."
@@ -1843,16 +1848,17 @@ def main():
         }
         ai_error = None
     else:
-        ai_decision, ai_error = call_openai(openai_key, openai_model, {**context, "heuristic_decision": heuristic})
+        ai_decision, ai_error = call_openai(openai_key, openai_model, openai_reasoning_effort, {**context, "heuristic_decision": heuristic})
         decision = ai_decision or heuristic
-        if ai_error:
-            decision.setdefault("reasons", []).append(ai_error)
 
     decision = normalize_no_plan_recovery_day(decision, context)
     decision = normalize_yesterday_compliance_reasons(decision, context)
     decision = normalize_pure_easy_day_decision(decision, context)
     decision = normalize_projected_metric_reasons(decision, context)
     decision = normalize_practical_actions(decision, context)
+
+    if ai_error and decision.get("source") != "openai":
+        decision.setdefault("reasons", []).append(f"Nota técnica: {ai_error}")
 
     applied = False
     apply_error = None
