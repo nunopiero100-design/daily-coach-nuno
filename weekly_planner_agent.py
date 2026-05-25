@@ -20,7 +20,6 @@ Secrets/env:
 
 import argparse
 import base64
-import csv
 import datetime as dt
 import json
 import math
@@ -448,89 +447,13 @@ def reentry_week(macro_week):
         6: ("REENTRY S%02d Dom — Social/endurance controlado" % macro_week, "Domingo livre, mas evitar pancadaria se a semana de regresso pesar.", sunday_150()),
     }
 
-def load_planned_snapshot_file(path):
-    """
-    Load an optional planned-events snapshot (CSV or JSON).
-    This is useful because workouts removed from the Intervals calendar disappear
-    from the API and otherwise the weekly report underestimates the original plan.
-    Expected fields are compatible with plan_events.csv/json:
-    date/start_date_local, name, duration_min/duration_h, load, external_id.
-    """
-    if not path:
-        return []
-    p = Path(path)
-    if not p.exists():
-        return []
-
-    try:
-        if p.suffix.lower() == ".json":
-            data = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                data = data.get("events") or data.get("plan") or []
-            return as_list(data)
-
-        rows = []
-        with p.open(newline="", encoding="utf-8") as f:
-            for r in csv.DictReader(f):
-                item = dict(r)
-                # Normalize load/duration keys for metric_load/metric_hours.
-                if item.get("duration_min") and not item.get("moving_time"):
-                    item["moving_time"] = float(item["duration_min"]) * 60
-                if item.get("duration_h") and not item.get("duration"):
-                    item["duration"] = float(item["duration_h"])
-                rows.append(item)
-        return rows
-    except Exception as e:
-        print(f"Aviso: não consegui ler planned snapshot {path!r}: {e}")
-        return []
-
-
-def merge_planned_with_snapshot(events, snapshot_events, start, end):
-    """
-    Use Intervals current planned events plus optional original plan snapshot.
-    Snapshot items are added only if no current calendar event has the same
-    external_id or same date+name. This preserves the original plan for weekly
-    comparison when a workout was manually removed from the Intervals calendar.
-    """
-    planned = [e for e in events if parse_item_date(e) and start <= parse_item_date(e) <= end]
-    if not snapshot_events:
-        return planned, "calendar_current"
-
-    out = list(planned)
-    seen_ext = {str(e.get("external_id") or "") for e in planned if e.get("external_id")}
-    seen_day_name = {
-        (parse_item_date(e), str(e.get("name") or "").strip().lower())
-        for e in planned if parse_item_date(e)
-    }
-
-    added = 0
-    for e in snapshot_events:
-        d = parse_item_date(e)
-        if not d or not (start <= d <= end):
-            continue
-
-        ext = str(e.get("external_id") or "")
-        day_name = (d, str(e.get("name") or "").strip().lower())
-        if (ext and ext in seen_ext) or day_name in seen_day_name:
-            continue
-
-        out.append(e)
-        added += 1
-        if ext:
-            seen_ext.add(ext)
-        seen_day_name.add(day_name)
-
-    source = "calendar_plus_snapshot" if added else "calendar_current"
-    return out, source
-
-
-
-def summarize_prior_week(events, activities, week_start, snapshot_events=None):
+def summarize_prior_week(events, activities, week_start):
     start = week_start - dt.timedelta(days=7)
     end = week_start - dt.timedelta(days=1)
     sunday = end
 
-    planned, planned_source = merge_planned_with_snapshot(events, snapshot_events or [], start, end)
+    planned = [e for e in events if parse_item_date(e) and start <= parse_item_date(e) <= end]
+    planned_source = "calendar_current"
     done = [
         a for a in activities
         if parse_item_date(a)
@@ -780,13 +703,6 @@ def main():
     plan_start = dt.date.fromisoformat(os.getenv("PLAN_START_DATE", DEFAULT_PLAN_START_DATE).strip() or DEFAULT_PLAN_START_DATE)
     plan_id = os.getenv("PLAN_ID", DEFAULT_PLAN_ID).strip() or DEFAULT_PLAN_ID
     weekly_auto = bool_env("WEEKLY_AUTO_APPLY", False)
-    planned_snapshot_path = os.getenv("WEEKLY_PLANNED_EVENTS_FILE", "").strip()
-    if not planned_snapshot_path:
-        # Optional default: if a plan_events.csv/json exists in the repo, use it as the original plan snapshot.
-        if Path("plan_events.csv").exists():
-            planned_snapshot_path = "plan_events.csv"
-        elif Path("plan_events.json").exists():
-            planned_snapshot_path = "plan_events.json"
     if not key:
         raise RuntimeError("Falta INTERVALS_API_KEY.")
 
@@ -810,7 +726,6 @@ def main():
     wellness = client.wellness_range(history_start, history_end)
     activities = client.activities_range(history_start, history_end)
     events = client.events_range(week_start - dt.timedelta(days=7), week_start + dt.timedelta(days=6))
-    planned_snapshot_events = load_planned_snapshot_file(planned_snapshot_path)
 
     by_day = {}
     for w in wellness:
@@ -827,7 +742,7 @@ def main():
     no_bike_current, no_bike_event = has_no_bike_week(events, week_start, week_start + dt.timedelta(days=6))
     no_bike_previous, previous_no_bike_event = has_no_bike_week(events, week_start - dt.timedelta(days=7), week_start - dt.timedelta(days=1))
 
-    prior = summarize_prior_week(events, activities, week_start, planned_snapshot_events)
+    prior = summarize_prior_week(events, activities, week_start)
     if pre_plan:
         adjustment = "pre_plan_observation"
         reasons = [
@@ -894,10 +809,7 @@ def main():
         lines.append(f"Desvio: {sign}{fmt(diff,0)} TSS | {sign}{fmt(ratio_pct,0)}% vs planeado")
     lines.append(f"Domingo: planeado {fmt(prior.get('sunday_planned_load'),0)} TSS / realizado {fmt(prior.get('sunday_done_load'),0)} TSS | {fmt_h(prior.get('sunday_done_hours'))}")
     lines.append(f"Sem domingo: planeado {fmt(prior.get('planned_load_ex_sunday'),0)} TSS / realizado {fmt(prior.get('done_load_ex_sunday'),0)} TSS")
-    if prior.get("planned_source") == "calendar_plus_snapshot":
-        lines.append("Fonte planeado: calendário atual + snapshot original do plano (inclui treinos removidos do calendário).")
-    else:
-        lines.append("Fonte planeado: calendário atual do Intervals.")
+    lines.append("Fonte planeado: calendário atual do Intervals.")
     lines.append("")
     lines.append("ÚLTIMO WELLNESS")
     lines.append(f"Data: {latest_day.isoformat() if latest_day else 'n/d'}")
