@@ -1082,6 +1082,80 @@ def mild_fatigue_no_plan(context):
     return signals >= 2
 
 
+def recent_concentrated_load_no_plan(context):
+    """
+    Detect a no-planned-workout day after a recent concentrated load,
+    even if yesterday was rest and today's HRV/RHR look good.
+    """
+    planned = context.get("planned_events_today", []) or []
+    done_today = context.get("done_today", []) or []
+    if planned or done_today:
+        return False
+
+    recent_3d = context.get("recent_3d", {}) or {}
+    recent_load = recent_3d.get("load") or 0
+    recent_hours = recent_3d.get("hours") or 0
+
+    y = context.get("yesterday", {}).get("compliance", {}) or {}
+    y_load = y.get("done_load") or 0
+    y_hours = y.get("done_hours") or 0
+    y_status = str(y.get("status") or "").upper()
+
+    # If yesterday itself was big/hard.
+    if y_load >= 150 or y_hours >= 3.0 or "MAIS DURO" in y_status:
+        return True
+
+    # If the last 3 days still contain a single big ride / concentrated load,
+    # even after a rest day. This catches Monday after a big Saturday.
+    if recent_load >= 180 and recent_hours >= 3.0:
+        return True
+
+    return False
+
+
+def normalize_no_plan_after_recent_load(decision, context):
+    """
+    Keep the tone realistic after a big recent ride:
+    not panic, but no optional long Z2 either.
+    """
+    if not recent_concentrated_load_no_plan(context) or mild_fatigue_no_plan(context):
+        return decision
+
+    recent_3d = context.get("recent_3d", {}) or {}
+    recent_load = recent_3d.get("load") or 0
+    recent_hours = recent_3d.get("hours") or 0
+
+    # If OpenAI already said green, it can stay green, but make it a recovery-green.
+    if decision.get("status") not in ("AMARELO", "VERMELHO"):
+        decision["status"] = "VERDE"
+
+    decision["decision_text"] = "Sem treino planeado; descanso total preferencial, ou recovery curto se quiseres mexer as pernas."
+
+    reasons = list(decision.get("reasons") or [])
+    cleaned = []
+    for r in reasons:
+        low = str(r).lower()
+        if "sem carga a compensar" in low or "sem carga" in low and "compens" in low:
+            continue
+        cleaned.append(str(r))
+
+    msg = f"Últimos 3 dias ainda incluem carga concentrada ({fmt(recent_load,0)} TSS | {fmt_h(recent_hours)}); não é preciso compensar nem acrescentar volume."
+    if msg not in cleaned:
+        cleaned.insert(0, msg)
+
+    decision["reasons"] = cleaned[:5]
+    decision["actions"] = [
+        "Plano normal: descanso total preferencial.",
+        "Se quiseres mexer as pernas: 30–45 min recovery/Z1-Z2 muito fácil, HR baixa, RPE 1–2/10, sem blocos e sem perseguir TSS.",
+        "Se tiveres 60 min disponíveis: não é preciso usar os 60; faz 30–45 min muito fácil ou descansa.",
+        "Se for indoor/rolo: recovery muito fácil com boa ventilação; não transformar descanso em treino.",
+        "Recuperação/fueling: défice leve aceitável, proteína alta e hidratação; manter hidratos moderados se houver fome ou fadiga."
+    ]
+
+    return decision
+
+
+
 def normalize_no_plan_recovery_day(decision, context):
     """
     If there is no planned workout and mild fatigue markers are present,
@@ -1428,10 +1502,10 @@ def normalize_practical_actions(decision, context):
             a60 = "Se tiveres 60 min disponíveis: não é preciso usar os 60; faz 30–45 min recovery muito fácil ou descansa."
             a45 = "Se quiseres rolar 45 min: recovery/Z1-Z2 muito fácil, HR baixa, RPE 1–2/10, sem blocos."
             indoor = "Se for indoor/rolo: recovery muito fácil com boa ventilação; não transformar em Z2 longo nem em intensidade."
-        elif big_yesterday or high_recent_load:
+        elif big_yesterday or high_recent_load or recent_concentrated_load_no_plan(context):
             decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil conforme sensação."
-            a60 = "Se quiseres mesmo rolar 60 min: só recovery/Z1-Z2 muito fácil, HR baixa, sem blocos."
-            a45 = "Se quiseres rolar 45 min: recovery muito fácil; descanso total também é excelente."
+            a60 = "Se tiveres 60 min disponíveis: não é preciso usar os 60; faz 30–45 min muito fácil ou descansa."
+            a45 = "Se quiseres rolar 45 min: recovery/Z1-Z2 muito fácil, HR baixa, RPE 1–2/10, sem blocos."
             indoor = "Se for indoor/rolo: soltar pernas muito fácil; não transformar recuperação em treino."
         else:
             a60 = "Se quiseres rolar 60 min: Z2 muito fácil/recovery, HR controlada, sem blocos."
@@ -1852,6 +1926,7 @@ def main():
         decision = ai_decision or heuristic
 
     decision = normalize_no_plan_recovery_day(decision, context)
+    decision = normalize_no_plan_after_recent_load(decision, context)
     decision = normalize_yesterday_compliance_reasons(decision, context)
     decision = normalize_pure_easy_day_decision(decision, context)
     decision = normalize_projected_metric_reasons(decision, context)
