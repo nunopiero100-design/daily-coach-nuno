@@ -277,7 +277,10 @@ def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
             lines.append("Défice leve pode existir no dia, mas não à custa de sair vazio num treino longo.")
         else:
             lines.append("Durante o treino: 30–45 g hidratos/h é suficiente para Z2 de ~75–120 min; água/eletrólitos se for muito fácil.")
-            lines.append("Défice leve é aceitável, mas sem sair vazio após dois dias de qualidade.")
+            if y_done_load >= 80 or "CUMPRIDO" in y_status:
+                lines.append("Défice leve é aceitável, mas sem sair vazio no dia seguinte a trabalho de qualidade.")
+            else:
+                lines.append("Défice leve é aceitável, mas sem sair vazio se houver fadiga acumulada.")
     elif is_mixed_quality_easy:
         lines.append("Hoje é qualidade controlada com Z2: há blocos de intensidade, mas o restante deve ficar fácil/controlado.")
         lines.append("Durante o treino: 50–70 g hidratos/h se a sessão passar de ~75 min; usar bidão + gel/chews se necessário.")
@@ -877,6 +880,11 @@ Regras específicas:
    - Recomendar descanso total preferencial; no máximo 30-45 min recovery muito fácil.
    - Não sugerir 60-75 min Z2 como opção principal nestes dias.
    - No fueling, défice no máximo leve; evitar défice agressivo e priorizar recuperação.
+
+17. Regra wording fueling em Z2 após qualidade:
+   - Se hoje é Z2/endurance fácil após apenas um dia de qualidade, não escrever "após dois dias de qualidade".
+   - Preferir "no dia seguinte a trabalho de qualidade" ou "após threshold/SS/VO2 de ontem".
+   - Não exagerar a cautela: défice leve pode existir, mas não sair vazio.
 
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
