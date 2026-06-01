@@ -781,9 +781,15 @@ def decide_adjustment(macro_week, prior, latest_w):
         )
 
     if ratio_ex_sun is not None and ratio_ex_sun > 1.20:
-        reasons.append(
-            f"Carga sem contar domingo também ficou alta: {fmt(done_ex_sun,0)} vs {fmt(planned_ex_sun,0)} TSS."
-        )
+        if ratio is not None:
+            reasons.append(
+                f"Semana total ficou {fmt((ratio - 1) * 100,0)}% vs planeado, mas a carga ficou concentrada antes de domingo: "
+                f"sem domingo, {fmt(done_ex_sun,0)} vs {fmt(planned_ex_sun,0)} TSS."
+            )
+        else:
+            reasons.append(
+                f"Carga concentrada antes de domingo: sem domingo, {fmt(done_ex_sun,0)} vs {fmt(planned_ex_sun,0)} TSS."
+            )
 
     # True recovery week: only if macro says so, or if high load combines with bad wellness.
     if sunday_very_big and wellness_very_bad:
@@ -795,7 +801,7 @@ def decide_adjustment(macro_week, prior, latest_w):
 
     # Reduced week: useful if weekday/saturday load was also high, or if wellness is bad.
     if ratio_ex_sun is not None and ratio_ex_sun > 1.20:
-        return "reduced", reasons + ["Redução moderada: a carga extra não veio só do domingo."]
+        return "reduced", reasons + ["Redução leve/moderada para entrar na semana com margem, sem transformar a semana em recovery."]
     if sunday_very_big and wellness_bad:
         return "reduced", reasons + ["Domingo muito pesado e alguns sinais de fadiga: reduzir ligeiramente a semana."]
     if fm is not None and fm < -18:
@@ -994,6 +1000,23 @@ def main():
     total_load = sum(e["load"] for e in week_events)
     total_hours = sum(e["moving_time"] for e in week_events) / 3600
 
+    current_calendar_load = sum(e["load"] for e in current_week_calendar_events) if current_week_calendar_events else None
+    current_calendar_hours = sum(e["moving_time"] for e in current_week_calendar_events) / 3600 if current_week_calendar_events else None
+    suggested_delta_load = None
+    suggested_delta_pct = None
+    if week_events_source == "calendar_adjusted_suggestion" and current_calendar_load:
+        suggested_delta_load = total_load - current_calendar_load
+        suggested_delta_pct = (total_load / current_calendar_load - 1) * 100 if current_calendar_load else None
+
+    adjustment_display = adjustment
+    if week_events_source == "calendar_adjusted_suggestion" and adjustment == "reduced" and suggested_delta_pct is not None:
+        if suggested_delta_pct >= -8:
+            adjustment_display = "reduced_light"
+        elif suggested_delta_pct >= -18:
+            adjustment_display = "reduced_moderate"
+        else:
+            adjustment_display = "reduced"
+
     allow_apply = (args.apply or (args.auto and weekly_auto)) and not args.dry_run
     applied = False
     apply_msg = "Não aplicado."
@@ -1020,7 +1043,7 @@ def main():
     lines.append(f"WEEKLY PLANNER AGENT — Semana {macro_week} — {week_start.isoformat()}")
     lines.append("="*72)
     lines.append(f"Atleta: {athlete.get('name') or athlete.get('id') or 'n/d'}")
-    lines.append(f"Ajuste semanal: {adjustment}")
+    lines.append(f"Ajuste semanal: {adjustment_display}")
     if adjustment == "pre_plan_observation":
         lines.append("Modo especial: PRÉ-PLANO / FasCat em observação.")
     elif adjustment == "no_bike":
@@ -1061,6 +1084,11 @@ def main():
             lines.append("Fonte plano da semana: calendário atual do Intervals (mantém alterações manuais/ajustes já existentes).")
         elif week_events_source == "calendar_adjusted_suggestion":
             lines.append("Fonte plano da semana: calendário atual do Intervals + ajuste semanal sugerido pelo Weekly.")
+            if suggested_delta_load is not None and suggested_delta_pct is not None:
+                lines.append(
+                    f"Redução sugerida: {fmt(suggested_delta_load,0)} TSS | {fmt(suggested_delta_pct,0)}% vs calendário atual "
+                    f"({fmt(current_calendar_load,0)} → {fmt(total_load,0)} TSS)."
+                )
             lines.append("Modo: sugestão apenas; o Weekly não aplicou alterações automaticamente.")
         elif week_events_source.startswith("generated"):
             lines.append("Fonte plano da semana: template interno do Weekly.")
@@ -1089,6 +1117,11 @@ def main():
         "pre_plan": pre_plan,
         "plan_start": plan_start.isoformat(),
         "adjustment": adjustment,
+        "adjustment_display": adjustment_display,
+        "suggested_delta_load": suggested_delta_load,
+        "suggested_delta_pct": suggested_delta_pct,
+        "current_calendar_load": current_calendar_load,
+        "current_calendar_hours": current_calendar_hours,
         "reasons": reasons,
         "prior_week": prior,
         "latest_wellness_date": latest_day.isoformat() if latest_day else None,
@@ -1107,7 +1140,7 @@ def main():
         Path("weekly_debug_raw.json").write_text(json.dumps({"wellness": wellness, "activities": activities[:80], "events": events}, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
     if args.email:
-        ok, msg = send_email(f"Weekly Planner — Semana {macro_week} — {adjustment} — {week_start.isoformat()}", report, ["weekly_planner_report.json"])
+        ok, msg = send_email(f"Weekly Planner — Semana {macro_week} — {adjustment_display} — {week_start.isoformat()}", report, ["weekly_planner_report.json"])
         report += "\nEMAIL\n"
         report += f"- {msg}\n"
         Path("weekly_planner_report.txt").write_text(report, encoding="utf-8")
