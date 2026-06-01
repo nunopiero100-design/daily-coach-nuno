@@ -447,6 +447,200 @@ def reentry_week(macro_week):
         6: ("REENTRY S%02d Dom — Social/endurance controlado" % macro_week, "Domingo livre, mas evitar pancadaria se a semana de regresso pesar.", sunday_150()),
     }
 
+
+def current_calendar_week_plan(events, start, end):
+    """
+    Return the planned workouts already present in the Intervals calendar for the target week.
+    This is now the preferred source for the Weekly report when a plan already exists,
+    because the calendar may contain manual or Daily-adjusted workouts that differ from
+    the static template.
+    """
+    out = []
+    seen = set()
+
+    for e in events:
+        d = parse_item_date(e)
+        if not d or not (start <= d <= end):
+            continue
+        if is_no_bike_event(e):
+            continue
+
+        name = str(first(e, ["name", "title", "summary"]) or "").strip()
+        if not name:
+            continue
+
+        load = metric_load(e)
+        hours = metric_hours(e)
+
+        # Ignore non-training calendar items with no usable duration/load.
+        if (load is None or load <= 0) and (hours is None or hours <= 0):
+            continue
+
+        start_local = str(first(e, ["start_date_local", "start_date", "date", "day"]) or d.isoformat())
+        if "T" not in start_local:
+            start_local = f"{d.isoformat()}T08:00:00"
+
+        moving_time = int(round((hours or 0) * 3600))
+        if moving_time <= 0:
+            moving_time = int(round((fnum(first(e, ["moving_time", "elapsed_time", "duration"])) or 0)))
+
+        key = (d.isoformat(), name.lower(), round(float(load or 0), 1), moving_time)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        out.append({
+            "category": e.get("category") or "WORKOUT",
+            "type": e.get("type") or "Ride",
+            "start_date_local": start_local,
+            "name": name,
+            "description": str(e.get("description") or ""),
+            "moving_time": moving_time,
+            "load": int(round(float(load or 0))),
+            "icu_training_load": int(round(float(load or 0))),
+            "external_id": e.get("external_id") or e.get("id") or "",
+            "source": "calendar_current",
+        })
+
+    out.sort(key=lambda x: x.get("start_date_local", ""))
+    return out
+
+
+
+
+def classify_week_event(e):
+    name = str(e.get("name") or "").lower()
+    load = float(e.get("load") or e.get("icu_training_load") or 0)
+    moving_time = float(e.get("moving_time") or 0)
+    hours = moving_time / 3600 if moving_time else 0
+
+    is_vo2 = any(t in name for t in ["vo2", "v02", "110%", "108%", "anaerobic", "aerobic capacity"])
+    is_threshold = any(t in name for t in ["threshold", "ftp", "100%", "over", "under"])
+    is_ss = any(t in name for t in ["sweet spot", "ss ", " ss", "@90", "@88", "climb base"])
+    is_tempo = any(t in name for t in ["tempo", "@83", "@85"])
+    is_quality = is_vo2 or is_threshold or is_ss or is_tempo or load >= 85
+    is_z2 = any(t in name for t in ["zone 2", "z2", "endurance", "recovery", "recuper", "fácil", "facil", "easy", "puro"])
+    is_social = any(t in name for t in ["social", "group", "climbs", "grupo"])
+    is_long = hours >= 2.0 or load >= 120
+
+    if is_social:
+        return "social"
+    if is_vo2:
+        return "vo2"
+    if is_threshold:
+        return "threshold"
+    if is_ss:
+        return "sweet_spot"
+    if is_tempo:
+        return "tempo"
+    if is_z2 and is_long:
+        return "long_endurance"
+    if is_z2:
+        return "z2"
+    if is_quality:
+        return "quality"
+    return "other"
+
+
+def adjusted_calendar_event(e, adjustment):
+    """
+    Build a report-only adjusted version of a current Intervals planned workout.
+    It preserves day/time and intent, but adjusts dose. This intentionally does
+    not generate a new ZWO yet; v7.29 is for testing the Weekly recommendation.
+    """
+    out = dict(e)
+    kind = classify_week_event(e)
+
+    original_name = str(e.get("name") or "Treino")
+    original_load = int(round(float(e.get("load") or e.get("icu_training_load") or 0)))
+    original_moving_time = int(float(e.get("moving_time") or 0))
+    original_hours = original_moving_time / 3600 if original_moving_time else 0
+
+    factor_load = 1.0
+    factor_time = 1.0
+    note = "Manter como está."
+
+    if adjustment == "recovery":
+        if kind in ("vo2", "threshold", "sweet_spot", "tempo", "quality"):
+            factor_load = 0.55
+            factor_time = 0.65
+            note = "Converter qualidade para recovery/Z2 muito fácil."
+        elif kind == "social":
+            factor_load = 0.55
+            factor_time = 0.60
+            note = "Evitar volta social dura; recovery/endurance curto."
+        elif kind in ("long_endurance", "z2"):
+            factor_load = 0.65 if original_load >= 70 else 0.85
+            factor_time = 0.65 if original_hours >= 1.5 else 0.85
+            note = "Reduzir para recovery/Z2 fácil."
+        else:
+            factor_load = 0.70
+            factor_time = 0.70
+            note = "Reduzir por semana recovery."
+    elif adjustment == "reduced":
+        if kind == "vo2":
+            factor_load = 0.82
+            factor_time = 0.88
+            note = "Reduzir VO2: cortar 1 repetição ou baixar dose 10–15%."
+        elif kind in ("threshold", "sweet_spot", "tempo", "quality"):
+            factor_load = 0.86
+            factor_time = 0.90
+            note = "Reduzir qualidade: cortar 1 bloco ou baixar 3–5% nos alvos."
+        elif kind == "social":
+            # Social rides are risky because variability and ego sneak in.
+            target = min(original_load * 0.86, 130)
+            factor_load = (target / original_load) if original_load > 0 else 1.0
+            factor_time = 0.90
+            note = "Manter social/endurance mas com CAP mais rígido e sem pancadaria."
+        elif kind == "long_endurance":
+            factor_load = 0.88
+            factor_time = 0.90
+            note = "Reduzir endurance longo; Z2 real e sem perseguir TSS."
+        elif kind == "z2":
+            # Keep normal Z2 unless it is quite long/heavy.
+            if original_load >= 65 or original_hours >= 1.75:
+                factor_load = 0.90
+                factor_time = 0.90
+                note = "Z2 ligeiramente mais curto/fácil."
+            else:
+                factor_load = 1.0
+                factor_time = 1.0
+                note = "Manter Z2 como dia de absorção."
+        else:
+            factor_load = 0.90
+            factor_time = 0.90
+            note = "Redução leve/moderada."
+
+    new_load = max(1, int(round(original_load * factor_load)))
+    new_moving_time = original_moving_time
+    if original_moving_time:
+        new_moving_time = max(30 * 60, int(round(original_moving_time * factor_time / 60)) * 60)
+
+    # Keep easy Z2 days readable; mark adjusted only when changed.
+    changed = (new_load != original_load) or (new_moving_time != original_moving_time)
+    if changed:
+        out["name"] = "AJUSTADO — " + original_name if not original_name.startswith("AJUSTADO") else original_name
+    else:
+        out["name"] = original_name
+
+    out["load"] = new_load
+    out["icu_training_load"] = new_load
+    out["moving_time"] = new_moving_time
+    out["adjustment_note"] = note
+    out["original_name"] = original_name
+    out["original_load"] = original_load
+    out["original_moving_time"] = original_moving_time
+    out["source"] = "calendar_adjusted_suggestion" if changed else "calendar_current_kept"
+    return out
+
+
+def adjusted_calendar_week_plan(current_events, adjustment):
+    if adjustment not in ("reduced", "recovery"):
+        return list(current_events)
+    return [adjusted_calendar_event(e, adjustment) for e in current_events]
+
+
+
 def summarize_prior_week(events, activities, week_start):
     start = week_start - dt.timedelta(days=7)
     end = week_start - dt.timedelta(days=1)
@@ -703,6 +897,9 @@ def main():
     plan_start = dt.date.fromisoformat(os.getenv("PLAN_START_DATE", DEFAULT_PLAN_START_DATE).strip() or DEFAULT_PLAN_START_DATE)
     plan_id = os.getenv("PLAN_ID", DEFAULT_PLAN_ID).strip() or DEFAULT_PLAN_ID
     weekly_auto = bool_env("WEEKLY_AUTO_APPLY", False)
+    weekly_use_current_calendar_plan = bool_env("WEEKLY_USE_CURRENT_CALENDAR_PLAN", True)
+    weekly_force_generate = bool_env("WEEKLY_FORCE_GENERATE", False)
+    weekly_suggest_adjust_current_plan = bool_env("WEEKLY_SUGGEST_ADJUST_CURRENT_PLAN", True)
     if not key:
         raise RuntimeError("Falta INTERVALS_API_KEY.")
 
@@ -726,6 +923,7 @@ def main():
     wellness = client.wellness_range(history_start, history_end)
     activities = client.activities_range(history_start, history_end)
     events = client.events_range(week_start - dt.timedelta(days=7), week_start + dt.timedelta(days=6))
+    current_week_calendar_events = current_calendar_week_plan(events, week_start, week_start + dt.timedelta(days=6))
 
     by_day = {}
     for w in wellness:
@@ -743,6 +941,8 @@ def main():
     no_bike_previous, previous_no_bike_event = has_no_bike_week(events, week_start - dt.timedelta(days=7), week_start - dt.timedelta(days=1))
 
     prior = summarize_prior_week(events, activities, week_start)
+    week_events_source = "generated_template"
+
     if pre_plan:
         adjustment = "pre_plan_observation"
         reasons = [
@@ -751,17 +951,45 @@ def main():
             "Usar este relatório apenas para analisar carga realizada, wellness e tendência."
         ]
         week_events = []
+        week_events_source = "none_pre_plan"
     elif no_bike_current:
         adjustment = "no_bike"
         reasons = ["NO BIKE WEEK detetada no Intervals. Não criar treinos de bicicleta; não compensar carga perdida."]
         week_events = build_events(week_start, macro_week, adjustment, plan_id)
+        week_events_source = "generated_no_bike"
     elif no_bike_previous:
         adjustment = "reentry"
         reasons = ["Semana anterior marcada como NO BIKE WEEK. Criar semana de reentrada progressiva, sem VO2 pesado logo de início."]
-        week_events = build_events(week_start, macro_week, adjustment, plan_id)
+        generated_events = build_events(week_start, macro_week, adjustment, plan_id)
+        if weekly_use_current_calendar_plan and current_week_calendar_events and not weekly_force_generate:
+            week_events = current_week_calendar_events
+            week_events_source = "calendar_current"
+            reasons.append("Plano desta semana já existe no Intervals; manter calendário atual e deixar o Daily ajustar dia a dia.")
+        else:
+            week_events = generated_events
+            week_events_source = "generated_template"
     else:
         adjustment, reasons = decide_adjustment(macro_week, prior, latest_w)
-        week_events = build_events(week_start, macro_week, adjustment, plan_id)
+        generated_events = build_events(week_start, macro_week, adjustment, plan_id)
+        if weekly_use_current_calendar_plan and current_week_calendar_events and not weekly_force_generate:
+            if adjustment in ("reduced", "recovery") and weekly_suggest_adjust_current_plan:
+                week_events = adjusted_calendar_week_plan(current_week_calendar_events, adjustment)
+                week_events_source = "calendar_adjusted_suggestion"
+                reasons.append(
+                    "Plano desta semana lido do calendário atual do Intervals e ajustado em dose, preservando dias/intenção dos treinos."
+                )
+                reasons.append("Sugestão apenas nesta versão: WEEKLY_AUTO_APPLY não substitui treinos ajustados automaticamente.")
+            else:
+                week_events = current_week_calendar_events
+                week_events_source = "calendar_current"
+                reasons.append(
+                    "Plano desta semana lido do calendário atual do Intervals; não regenerar a partir do template para não sobrescrever alterações manuais/ajustes já feitos."
+                )
+                if adjustment in ("reduced", "recovery"):
+                    reasons.append("Ajuste semanal calculado fica como observação; o Daily Coach valida e ajusta cada treino no próprio dia.")
+        else:
+            week_events = generated_events
+            week_events_source = "generated_template"
 
     total_load = sum(e["load"] for e in week_events)
     total_hours = sum(e["moving_time"] for e in week_events) / 3600
@@ -772,6 +1000,10 @@ def main():
     if allow_apply:
         if pre_plan:
             apply_msg = "PRÉ-PLANO: nada aplicado antes do PLAN_START_DATE."
+        elif week_events_source == "calendar_current":
+            apply_msg = "Plano já existe no Intervals; Weekly manteve calendário atual e não gerou substituições."
+        elif week_events_source == "calendar_adjusted_suggestion":
+            apply_msg = "Plano ajustado gerado como sugestão; nada aplicado automaticamente nesta versão."
         elif week_events:
             client.upload_bulk_events(week_events)
             applied = True
@@ -825,12 +1057,25 @@ def main():
         lines.append("- O Weekly serve apenas para observar carga/wellness até ao arranque do plano em " + plan_start.isoformat() + ".")
     else:
         lines.append(f"Total estimado: {fmt(total_load,0)} TSS | {fmt_h(total_hours)}")
+        if week_events_source == "calendar_current":
+            lines.append("Fonte plano da semana: calendário atual do Intervals (mantém alterações manuais/ajustes já existentes).")
+        elif week_events_source == "calendar_adjusted_suggestion":
+            lines.append("Fonte plano da semana: calendário atual do Intervals + ajuste semanal sugerido pelo Weekly.")
+            lines.append("Modo: sugestão apenas; o Weekly não aplicou alterações automaticamente.")
+        elif week_events_source.startswith("generated"):
+            lines.append("Fonte plano da semana: template interno do Weekly.")
         if not week_events and adjustment == "no_bike":
             lines.append("- Sem treinos de ciclismo criados esta semana.")
             lines.append("- Manutenção sugerida: caminhadas, mobilidade e core leve 2-3x, sem tentar simular VO2/threshold fora da bicicleta.")
             lines.append("- Regresso: semana seguinte deve ser progressiva, sem compensar carga perdida.")
         for e in week_events:
-            lines.append(f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)}")
+            if e.get("source") == "calendar_adjusted_suggestion":
+                lines.append(
+                    f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)} "
+                    f"(original {fmt(e.get('original_load'),0)} TSS | {fmt_h((e.get('original_moving_time') or 0)/3600)}) — {e.get('adjustment_note','')}"
+                )
+            else:
+                lines.append(f"- {e['start_date_local'][:10]} {e['name']} | {fmt(e['load'],0)} TSS | {fmt_h(e['moving_time']/3600)}")
     lines.append("")
     lines.append("INTERVALS")
     lines.append(f"- {apply_msg}")
@@ -849,6 +1094,8 @@ def main():
         "latest_wellness_date": latest_day.isoformat() if latest_day else None,
         "latest_wellness": latest_w,
         "planned_events": [{k:v for k,v in e.items() if k != "file_contents_base64"} for e in week_events],
+        "week_events_source": week_events_source,
+        "current_week_calendar_events": [{k:v for k,v in e.items() if k != "file_contents_base64"} for e in current_week_calendar_events],
         "applied": applied,
         "apply_msg": apply_msg,
     }
