@@ -886,6 +886,11 @@ Regras específicas:
    - Preferir "no dia seguinte a trabalho de qualidade" ou "após threshold/SS/VO2 de ontem".
    - Não exagerar a cautela: défice leve pode existir, mas não sair vazio.
 
+18. Regra AMARELO com Z2 longo após carga alta:
+   - Se o estado é AMARELO, ontem foi muito acima do planeado, e hoje o treino planeado é Z2/endurance longo, a primeira ação NÃO pode ser "fazer o treino como planeado".
+   - Usar "Plano normal ajustado": descanso total ou 45–75 min recovery/Z2 muito fácil; no máximo 90 min se HR/RPE estiverem muito baixos.
+   - Não sugerir 2h/3h Z2 como plano principal nestes dias.
+
 Responde em português, seguindo EXATAMENTE este formato simples.
 Não uses JSON.
 Não uses aspas.
@@ -1413,6 +1418,21 @@ def normalize_practical_actions(decision, context):
 
     long_or_social_weekend = planned_hours > 2.05 or any(t in lname for t in ["social", "group ride", "long", "longo", "endurance ride", "ride 3h", "ride 4h", "ride 5h"])
 
+    y = context.get("yesterday", {}).get("compliance", {}) or {}
+    y_done_load = y.get("done_load") or 0
+    y_done_hours = y.get("done_hours") or 0
+    y_status = str(y.get("status") or "").upper()
+    recent_load_3d = (context.get("recent_3d", {}) or {}).get("load") or 0
+    big_yesterday = y_done_load >= 150 or y_done_hours >= 3.0 or "MAIS DURO" in y_status
+    high_recent_load = recent_load_3d >= 300
+
+    amarelo_easy_recovery_reduction = (
+        status == "AMARELO"
+        and is_easy
+        and planned_hours >= 1.25
+        and (big_yesterday or high_recent_load)
+    )
+
     if status == "VERMELHO":
         a60 = "Se só tiveres 60 min: não usar para compensar; descanso total ou 45–60 min recovery muito leve em Z1/Z2."
         a45 = "Se só tiveres 45 min: descanso total preferível; se precisares mexer as pernas, 30–45 min rolo muito fácil."
@@ -1421,11 +1441,19 @@ def normalize_practical_actions(decision, context):
         weekend_weather = "Se chover/condições forem más: não forces a saída; descanso total ou recovery muito leve."
     elif status == "AMARELO":
         if is_easy:
-            a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
-            a45 = "Se só tiveres 45 min: 45 min recovery/Z2 muito fácil ou descanso, sem blocos."
-            indoor = "Se for indoor/rolo: fazer Z2 fácil/recovery com boa ventilação; não transformar em tempo/SS."
-            weekend_alt = "Se for sábado/domingo e não der para sair: 60–90 min Z2/recovery muito fácil; sem intensidade."
-            weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino Z2 planeado'} indoor/rolo em Z2 fácil, sem blocos."
+            if amarelo_easy_recovery_reduction:
+                decision["decision_text"] = "Reduzir o Z2 planeado para recuperação ativa; não fazer o volume completo como estava."
+                a60 = "Se só tiveres 60 min: 45–60 min recovery/Z2 muito fácil, HR baixa, RPE baixo, sem blocos."
+                a45 = "Se só tiveres 45 min: 30–45 min recovery muito fácil ou descanso, sem blocos."
+                indoor = "Se for indoor/rolo: recovery/Z2 muito fácil com boa ventilação; não transformar em endurance longo."
+                weekend_alt = "Se for sábado/domingo: 45–75 min recovery/Z2 muito fácil; no máximo 90 min se as pernas estiverem soltas e a HR baixa."
+                weekend_weather = "Se chover/condições forem más: descanso total ou 30–45 min rolo muito fácil; não tentar cumprir o volume original."
+            else:
+                a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
+                a45 = "Se só tiveres 45 min: 45 min recovery/Z2 muito fácil ou descanso, sem blocos."
+                indoor = "Se for indoor/rolo: fazer Z2 fácil/recovery com boa ventilação; não transformar em tempo/SS."
+                weekend_alt = "Se for sábado/domingo e não der para sair: 60–90 min Z2/recovery muito fácil; sem intensidade."
+                weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino Z2 planeado'} indoor/rolo em Z2 fácil, sem blocos."
         elif amarelo_forte_long_quality:
             decision["decision_text"] = "AMARELO forte: não fazer o treino longo/de qualidade como planeado; substituir por Z2 fácil/endurance controlado."
             extra_reasons = decision.setdefault("reasons", [])
@@ -1487,7 +1515,10 @@ def normalize_practical_actions(decision, context):
         return False
 
     cleaned = [a for a in actions if not replaceable(a)]
-    if amarelo_forte_long_quality:
+    if amarelo_easy_recovery_reduction:
+        cleaned = [a for a in cleaned if not str(a).lower().startswith("plano normal")]
+        cleaned.insert(0, "Plano normal ajustado: não fazer o Z2 longo como planeado; fazer 45–75 min recovery/Z2 muito fácil, sem blocos, ou descanso se as pernas estiverem pesadas.")
+    elif amarelo_forte_long_quality:
         cleaned = [a for a in cleaned if not str(a).lower().startswith("plano normal")]
         cleaned.insert(0, "Plano normal ajustado: não fazer o treino longo/de qualidade como planeado; fazer 90–120 min Z2 fácil/endurance, sem blocos, ou descanso se as pernas estiverem pesadas.")
     elif not any(str(a).lower().startswith("plano normal") for a in cleaned):
@@ -1497,13 +1528,6 @@ def normalize_practical_actions(decision, context):
             cleaned.insert(0, "Plano normal: descanso total preferencial; se quiseres pedalar, Z2 muito fácil, sem blocos.")
 
     no_planned_workout = not planned or planned_load <= 5
-    y = context.get("yesterday", {}).get("compliance", {}) or {}
-    y_done_load = y.get("done_load") or 0
-    y_done_hours = y.get("done_hours") or 0
-    y_status = str(y.get("status") or "").upper()
-    recent_load_3d = (context.get("recent_3d", {}) or {}).get("load") or 0
-    big_yesterday = y_done_load >= 150 or y_done_hours >= 3.0 or "MAIS DURO" in y_status
-    high_recent_load = recent_load_3d >= 300
     if no_planned_workout:
         if mild_fatigue_no_plan(context):
             decision["decision_text"] = "Descanso total preferencial; no máximo recovery muito fácil se quiseres mexer as pernas."
@@ -1520,7 +1544,7 @@ def normalize_practical_actions(decision, context):
             a45 = "Se quiseres rolar 45 min: recovery muito fácil ou descanso total."
             indoor = "Se for indoor/rolo: rolar muito fácil com boa ventilação; não transformar descanso em treino."
 
-    if is_weekend and is_easy and planned_hours > 2.05:
+    if is_weekend and is_easy and planned_hours > 2.05 and not amarelo_easy_recovery_reduction:
         cleaned.append("Se 2h30 não encaixar no sábado: 2h Z2 bem feitas são válidas; manter HR/RPE baixos e não perseguir TSS.")
     cleaned.append(a60)
     cleaned.append(a45)
