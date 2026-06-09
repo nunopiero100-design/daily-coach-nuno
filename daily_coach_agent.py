@@ -194,175 +194,6 @@ def mean(vals):
     return statistics.mean(vals) if vals else None
 
 
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
-
-
-def score_label(score):
-    if score is None:
-        return "n/d"
-    if score >= 75:
-        return "VERDE"
-    if score >= 60:
-        return "AMARELO LEVE"
-    if score >= 45:
-        return "AMARELO"
-    return "VERMELHO"
-
-
-def coach_recovery_score(context):
-    """
-    Simple WHOOP-like readiness score, but local to this coach system.
-    It does not change the Daily decision. It is only displayed as a compact
-    recovery/readiness indicator in the report.
-    """
-    tm = context.get("today_metrics", {}) or {}
-    bl = context.get("baseline_14d", {}) or {}
-    recent = context.get("recent_3d", {}) or {}
-    y = (context.get("yesterday", {}) or {}).get("compliance", {}) or {}
-
-    hrv_now = tm.get("hrv")
-    hrv_base = bl.get("hrv")
-    rhr_now = tm.get("resting_hr")
-    rhr_base = bl.get("rhr")
-    sleep_score_now = tm.get("sleep_score")
-    sleep_hours_now = tm.get("sleep_hours")
-    readiness_form = tm.get("readiness_form")
-
-    recent_load = recent.get("load") or 0
-    y_done_load = y.get("done_load") or 0
-    y_planned_load = y.get("planned_load") or 0
-    y_status = str(y.get("status") or "").upper()
-
-    components = {}
-    notes = []
-
-    # HRV component.
-    if hrv_now is not None and hrv_base:
-        hrv_ratio = hrv_now / hrv_base
-        if hrv_ratio >= 1.03:
-            hrv_score = 100
-        elif hrv_ratio >= 0.98:
-            hrv_score = 85
-        elif hrv_ratio >= 0.95:
-            hrv_score = 75
-        elif hrv_ratio >= 0.90:
-            hrv_score = 60
-        elif hrv_ratio >= 0.85:
-            hrv_score = 42
-        else:
-            hrv_score = 30
-        components["hrv_score"] = hrv_score
-        components["hrv_delta_pct"] = (hrv_ratio - 1) * 100
-        if hrv_ratio < 0.95:
-            notes.append(f"HRV {fmt((hrv_ratio - 1) * 100,0)}% vs baseline")
-    else:
-        hrv_score = None
-
-    # Resting HR component.
-    if rhr_now is not None and rhr_base:
-        rhr_delta = rhr_now - rhr_base
-        if rhr_delta <= 0:
-            rhr_score = 100
-        elif rhr_delta <= 1:
-            rhr_score = 85
-        elif rhr_delta <= 2:
-            rhr_score = 70
-        elif rhr_delta <= 3:
-            rhr_score = 55
-        elif rhr_delta <= 5:
-            rhr_score = 35
-        else:
-            rhr_score = 25
-        components["rhr_score"] = rhr_score
-        components["rhr_delta_bpm"] = rhr_delta
-        if rhr_delta >= 3:
-            notes.append(f"RHR +{fmt(rhr_delta,0)} bpm")
-    else:
-        rhr_score = None
-
-    # Sleep component.
-    if sleep_score_now is not None:
-        sleep_component = clamp(sleep_score_now, 35, 100)
-        if sleep_score_now < 85:
-            notes.append(f"sono score {fmt(sleep_score_now,0)}")
-    elif sleep_hours_now is not None:
-        if sleep_hours_now >= 8:
-            sleep_component = 92
-        elif sleep_hours_now >= 7:
-            sleep_component = 82
-        elif sleep_hours_now >= 6:
-            sleep_component = 65
-        else:
-            sleep_component = 45
-        if sleep_hours_now < 7:
-            notes.append(f"sono {fmt_h(sleep_hours_now)}")
-    else:
-        sleep_component = None
-    components["sleep_score_component"] = sleep_component
-
-    # Load/readiness component.
-    load_score = 100.0
-    if recent_load >= 450:
-        load_score -= 35
-    elif recent_load >= 350:
-        load_score -= 25
-    elif recent_load >= 280:
-        load_score -= 16
-    elif recent_load >= 200:
-        load_score -= 8
-
-    y_over = 0
-    if y_planned_load and y_done_load:
-        y_over = max(0, y_done_load - y_planned_load)
-    if y_over >= 150 or "MAIS DURO" in y_status:
-        load_score -= 24
-    elif y_over >= 80:
-        load_score -= 15
-    elif y_over >= 40:
-        load_score -= 8
-
-    if readiness_form is not None:
-        if readiness_form <= -25:
-            load_score -= 25
-        elif readiness_form <= -15:
-            load_score -= 16
-        elif readiness_form <= -8:
-            load_score -= 9
-        elif readiness_form <= -3:
-            load_score -= 4
-
-    load_score = clamp(load_score, 25, 100)
-    components["load_score"] = load_score
-    components["recent_3d_load"] = recent_load
-    components["yesterday_over_tss"] = y_over
-    if recent_load >= 300:
-        notes.append(f"carga 3d {fmt(recent_load,0)} TSS")
-    if y_over >= 60:
-        notes.append(f"ontem +{fmt(y_over,0)} TSS vs plano")
-
-    weighted = []
-    if hrv_score is not None:
-        weighted.append((hrv_score, 0.35))
-    if rhr_score is not None:
-        weighted.append((rhr_score, 0.25))
-    if sleep_component is not None:
-        weighted.append((sleep_component, 0.20))
-    weighted.append((load_score, 0.20))
-
-    total_weight = sum(w for _, w in weighted)
-    score = round(sum(v * w for v, w in weighted) / total_weight) if total_weight else None
-    label = score_label(score)
-
-    return {
-        "score": score,
-        "label": label,
-        "components": components,
-        "notes": notes[:3],
-        "description": "; ".join(notes[:3]) if notes else "sinais estáveis",
-    }
-
-
 def fueling_guidance(context, weight_today=None, weight_avg_7d=None):
     """Simple coaching guidance for weight loss without compromising training."""
     target_weight = 74.0
@@ -1538,6 +1369,92 @@ def normalize_projected_metric_reasons(decision, context):
 
 
 
+
+def detect_workout_family_for_actions(name: str, description: str = "") -> str:
+    """
+    Classifica o treino planeado para gerar alternativas curtas coerentes.
+    Evita que dias VO2 recebam alternativas genéricas de tempo/SS.
+    """
+    txt = f"{name or ''} {description or ''}".lower()
+
+    if "vo2" in txt or "vo₂" in txt or "vo2max" in txt:
+        return "vo2"
+
+    if "over-under" in txt or "over under" in txt or "over/under" in txt:
+        return "over_under"
+
+    if "threshold" in txt or "limiar" in txt or "ftp" in txt or "tte" in txt:
+        return "threshold"
+
+    if "sweet spot" in txt or "sweetspot" in txt or " ss " in f" {txt} ":
+        return "sweet_spot"
+
+    if "social" in txt or "grupo" in txt or "group" in txt or "cap" in txt:
+        return "social"
+
+    if "z2" in txt or "zone 2" in txt or "endurance" in txt or "recovery" in txt:
+        return "z2"
+
+    return "generic"
+
+
+def extract_interval_minutes_for_actions(name: str, description: str = "", default: int = 3) -> int:
+    """
+    Extrai a duração dos intervalos de padrões como 4x3, 4 x 3, 5x4, 4 x 5 min.
+    """
+    txt = f"{name or ''} {description or ''}".lower()
+
+    m = re.search(r"\b(\d+)\s*x\s*(\d+)\s*(?:min|m)?\b", txt)
+    if m:
+        try:
+            return int(m.group(2))
+        except Exception:
+            return default
+
+    return default
+
+
+def vo2_short_action_lines(name: str, description: str = "", status: str = "VERDE") -> tuple[str, str, str, str, str]:
+    """
+    Alternativas curtas específicas para dias VO2.
+    Mantém o estímulo VO2, mas corta volume em vez de trocar por tempo/SS.
+    """
+    rep_min = extract_interval_minutes_for_actions(name, description, default=3)
+    status = str(status or "").upper()
+
+    if rep_min <= 3:
+        if status == "AMARELO":
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 2–3x3 min VO2 controlado @105–108% com 3 min muito fácil, resto Z2 fácil e 5 min arrefecer."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x3 min VO2 controlado @105–108% com 3 min muito fácil, resto Z2 fácil e 5 min arrefecer; se estiver pesado, fica só em Z2."
+            indoor = "Se for indoor/rolo: cadência alta 95–105 rpm, ventoinha forte, recuperações mesmo fáceis; se a cadência cair, cortar uma repetição."
+        else:
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 3x3 min VO2 @108–110% com 3 min muito fácil, resto Z2 fácil e 5 min arrefecer. Sem sprint final."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x3 min VO2 @108–110% com 3 min muito fácil, resto Z2 fácil e 5 min arrefecer. Não compensar com watts extra."
+            indoor = "Se for indoor/rolo: fazer em ERG com cadência alta 95–105 rpm. Recuperações mesmo fáceis. Se a cadência cair ou o ERG prender, reduzir 2–3% ou cortar uma repetição."
+    elif rep_min == 4:
+        if status == "AMARELO":
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 2–3x4 min VO2 controlado @105–108% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x4 min VO2 controlado @105–108% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer; se estiver pesado, Z2."
+            indoor = "Se for indoor/rolo: cadência alta 95–105 rpm, recuperações muito fáceis. Se a 2.ª repetição já parecer limite, fazer só 2–3 reps."
+        else:
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 3x4 min VO2 @108–110% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer. Qualidade > quantidade."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x4 min VO2 @108–110% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer. Não compensar com watts extra."
+            indoor = "Se for indoor/rolo: cadência alta 95–105 rpm, ventoinha forte, sem começar acima do alvo. Se a 2.ª repetição já parecer limite, cortar uma repetição."
+    else:
+        if status == "AMARELO":
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 2–3x4 min VO2 controlado @105–108% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer. Encurtar reps longas antes de subir watts."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x4 min VO2 controlado @105–108% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer."
+            indoor = "Se for indoor/rolo: VO2 longo em ERG só com cadência alta. Se prender as pernas, encurtar repetições antes de subir watts."
+        else:
+            a60 = "Se só tiveres 60 min: 10–15 min aquecer, 3x4 min VO2 @108–110% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer. Reduzir reps longas para 4 min por segurança."
+            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x4 min VO2 @108–110% com 4 min muito fácil, resto Z2 fácil e 5 min arrefecer."
+            indoor = "Se for indoor/rolo: cadência alta 95–105 rpm. Se o VO2 longo prender as pernas, encurtar repetições antes de subir watts."
+
+    weekend_alt = "Se for sábado/domingo e não der para sair: 60–90 min indoor com Z2 dominante; se mantiveres VO2, fazer só 2–3 reps curtas e controladas."
+    weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino VO2 planeado'} indoor/rolo com versão curta se necessário; boa ventilação e sem watts extra."
+
+    return a60, a45, indoor, weekend_alt, weekend_weather
+
 def normalize_practical_actions(decision, context):
     """
     Forca alternativas praticas coerentes, porque o modelo pode errar contas de duracao.
@@ -1556,14 +1473,18 @@ def normalize_practical_actions(decision, context):
     is_weekend = bool(cal.get("weekend_indoor_alternative_required"))
 
     name = ""
+    planned_description = ""
     planned_load = 0
     planned_hours = 0
     if planned:
         name = str(planned[0].get("name") or "")
+        planned_description = str(planned[0].get("description") or "")
         planned_load = planned[0].get("load") or 0
         planned_hours = planned[0].get("hours") or 0
 
     lname = name.lower()
+    workout_family = detect_workout_family_for_actions(name, planned_description)
+    is_vo2_workout = workout_family == "vo2"
     easy_terms = [
         "zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"
     ]
@@ -1635,11 +1556,14 @@ def normalize_practical_actions(decision, context):
             weekend_alt = "Se for sábado/domingo e não der para sair ou se o treino planeado for demasiado pesado: 90–120 min Z2 fácil/endurance, sem blocos e sem perseguir TSS."
             weekend_weather = f"Se chover/condições forem más: não tentar salvar {name or 'o treino planeado'}; fazer 90–120 min Z2 fácil ou descanso."
         else:
-            a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
-            a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
-            indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
-            weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
-            weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
+            if is_vo2_workout:
+                a60, a45, indoor, weekend_alt, weekend_weather = vo2_short_action_lines(name, planned_description, status="AMARELO")
+            else:
+                a60 = "Se só tiveres 60 min: 10 min aquecer, 2x8 min tempo leve @80–85% com 5 min Z2, resto Z2 fácil, 5 min arrefecer."
+                a45 = "Se só tiveres 45 min: 10 min aquecer, 1x12 min tempo leve @80–85%, resto Z2 fácil, 5 min arrefecer."
+                indoor = "Se for indoor/rolo: versão reduzida; Z2 dominante e no máximo 2x8 min tempo leve @80–85%, sem perseguir watts."
+                weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 2x15 min tempo leve @80–85% com 8 min Z2, completar Z2, 10 min arrefecer."
+                weekend_weather = f"Se chover/condições forem más: faz uma versão indoor reduzida de {name or 'o treino planeado'}, mantendo Z2 dominante e sem forçar intensidade."
     else:
         if is_easy:
             a60 = "Se só tiveres 60 min: 60 min Z2 fácil/recovery, HR controlada, RPE baixo, sem blocos."
@@ -1648,11 +1572,14 @@ def normalize_practical_actions(decision, context):
             weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — Z2 contínuo confortável, 3x1 min cadência alta opcional, sem intensidade."
             weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo, mantendo Z2 fácil e RPE baixo."
         else:
-            a60 = "Se só tiveres 60 min: 10 min aquecer, 2x12 min tempo/SS baixo @85–88% com 6 min Z2, resto Z2 fácil, 5 min arrefecer."
-            a45 = "Se só tiveres 45 min: 10 min aquecer, 2x8 min tempo/SS baixo @85–88% com 5 min Z2, 9 min Z2 fácil, 5 min arrefecer."
-            indoor = "Se for indoor/rolo: manter controlado; usar 85–88% para tempo/SS baixo, não ir até FTP; ventoinha forte e RPE estável."
-            weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
-            weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo como planeado; é até 2h e é fazível no rolo. Ventoinha forte, hidratação e RPE controlado."
+            if is_vo2_workout:
+                a60, a45, indoor, weekend_alt, weekend_weather = vo2_short_action_lines(name, planned_description, status="VERDE")
+            else:
+                a60 = "Se só tiveres 60 min: 10 min aquecer, 2x12 min tempo/SS baixo @85–88% com 6 min Z2, resto Z2 fácil, 5 min arrefecer."
+                a45 = "Se só tiveres 45 min: 10 min aquecer, 2x8 min tempo/SS baixo @85–88% com 5 min Z2, 9 min Z2 fácil, 5 min arrefecer."
+                indoor = "Se for indoor/rolo: manter controlado; usar 85–88% para tempo/SS baixo, não ir até FTP; ventoinha forte e RPE estável."
+                weekend_alt = "Se for sábado/domingo e não der para sair: 90 min indoor — 15 min aquecer, 3x12 min tempo/SS baixo @85–88% com 6 min Z2, completar Z2, 10 min arrefecer."
+                weekend_weather = f"Se chover/condições forem más: faz {name or 'o treino planeado'} indoor/rolo como planeado; é até 2h e é fazível no rolo. Ventoinha forte, hidratação e RPE controlado."
 
     def replaceable(action):
         s = str(action).lower().strip()
@@ -2133,8 +2060,6 @@ def main():
     decision = normalize_projected_metric_reasons(decision, context)
     decision = normalize_practical_actions(decision, context)
 
-    context["coach_recovery_score"] = coach_recovery_score(context)
-
     if ai_error and decision.get("source") != "openai":
         decision.setdefault("reasons", []).append(f"Nota técnica: {ai_error}")
 
@@ -2215,11 +2140,6 @@ def main():
             f" | Form usada: {fmt(tm.get('readiness_form'),0)}"
         )
     lines.append(f"- Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
-    crs = context.get("coach_recovery_score", {}) or {}
-    if crs.get("score") is not None:
-        lines.append(f"- Coach Recovery Score: {fmt(crs.get('score'),0)}/100 | {crs.get('label')}")
-    else:
-        lines.append("- Coach Recovery Score: n/d")
     dq = context.get("data_quality", {})
     if not dq.get("is_complete", True):
         lines.append(f"- Qualidade dos dados: INCOMPLETA — faltam {', '.join(dq.get('missing_today_metrics', []))}")
