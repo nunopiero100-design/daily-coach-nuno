@@ -1650,14 +1650,60 @@ def normalize_practical_actions(decision, context):
             cleaned.append(weekend_alt)
         else:
             cleaned.append(weekend_weather)
-    recovery_lines = [
-        a for a in cleaned
-        if ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
-    ]
-    cleaned = [
-        a for a in cleaned
-        if not ("recuper" in str(a).lower() or "fuel" in str(a).lower() or "hidrata" in str(a).lower())
-    ]
+    def is_recovery_fueling_line(action):
+        """
+        Identifica apenas linhas de recuperação/fueling.
+        Não remove linhas práticas como 'Se for indoor/rolo', mesmo que contenham
+        palavras como 'recuperações' ou 'hidratação'.
+        """
+        s = str(action or "").lower().strip()
+
+        practical_prefixes = (
+            "plano normal",
+            "plano normal ajustado",
+            "se só tiveres",
+            "se so tiveres",
+            "se tiveres",
+            "se quiseres",
+            "se for indoor",
+            "se for rolo",
+            "se chover",
+            "se as condições",
+            "se as condicoes",
+            "se for sábado/domingo",
+            "se for sabado/domingo",
+            "if ",
+        )
+        if s.startswith(practical_prefixes):
+            return False
+
+        recovery_prefixes = (
+            "recuperação/fueling",
+            "recuperacao/fueling",
+            "recuperação:",
+            "recuperacao:",
+            "fueling:",
+            "hidratação:",
+            "hidratacao:",
+            "pós-treino:",
+            "pos-treino:",
+        )
+        if s.startswith(recovery_prefixes):
+            return True
+
+        # Fallback para linhas antigas geradas pelo modelo.
+        has_recovery_word = (
+            "recuperação" in s or "recuperacao" in s or "fuel" in s or
+            "hidratação" in s or "hidratacao" in s or "eletrólitos" in s or "eletrolitos" in s
+        )
+        has_nutrition_word = (
+            "proteína" in s or "proteina" in s or "hidratos" in s or "carbo" in s or
+            "défice" in s or "defice" in s
+        )
+        return has_recovery_word and has_nutrition_word
+
+    recovery_lines = [a for a in cleaned if is_recovery_fueling_line(a)]
+    cleaned = [a for a in cleaned if not is_recovery_fueling_line(a)]
 
     if no_planned_workout and (big_yesterday or high_recent_load):
         recovery = "Recuperação/fueling: após carga alta, não fazer défice agressivo; proteína 150–170 g, hidratos moderados, hidratação e eletrólitos."
