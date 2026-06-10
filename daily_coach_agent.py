@@ -133,6 +133,33 @@ def form(w):
     return None
 
 
+def pre_workout_value(today_w, yesterday_w, getter, planned_load_today, has_done_today):
+    """
+    For CTL/ATL/Form-like metrics that may be projected by Intervals with today's
+    planned workout, prefer yesterday's wellness as the pre-workout proxy when
+    today has a planned workout and no completed activity yet.
+    """
+    today_value = getter(today_w)
+    yesterday_value = getter(yesterday_w) if yesterday_w else None
+    if (
+        not has_done_today
+        and planned_load_today
+        and planned_load_today > 0
+        and yesterday_value is not None
+    ):
+        return yesterday_value
+    return today_value
+
+
+def form_from_ctl_atl(c, a):
+    if c is None or a is None:
+        return None
+    try:
+        return float(c) - float(a)
+    except Exception:
+        return None
+
+
 def load(item):
     return fnum(first(item, ["icu_training_load", "training_load", "load", "tss", "TSS"]))
 
@@ -508,7 +535,7 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
     return {"status": status, "reasons": reasons, "actions": actions, "source": "heuristic"}
 
 
-COACH_SYSTEM_VERSION = "v7.36"
+COACH_SYSTEM_VERSION = "v7.37"
 
 
 def clamp(n, low, high):
@@ -696,17 +723,15 @@ def clean_action_line(action):
 
 
 def report_form_pre_treino(tm):
-    """Prefer true pre-workout Form from readiness CTL/ATL for the short report."""
+    """Prefer the pre-workout Form used for readiness in the short report."""
     tm = tm or {}
-    c = tm.get("readiness_fitness_ctl")
-    a = tm.get("readiness_fatigue_atl")
-    if c is not None and a is not None:
-        try:
-            return float(c) - float(a)
-        except Exception:
-            pass
     if tm.get("readiness_form") is not None:
         return tm.get("readiness_form")
+    c = tm.get("readiness_fitness_ctl")
+    a = tm.get("readiness_fatigue_atl")
+    value = form_from_ctl_atl(c, a)
+    if value is not None:
+        return value
     return tm.get("form")
 
 
@@ -1010,6 +1035,7 @@ def main():
             by_day[d] = w
 
     today_w = by_day.get(target, {})
+    yesterday_w = by_day.get(yesterday, {})
     prev14 = [by_day[d] for d in [target - dt.timedelta(days=i) for i in range(1, 15)] if d in by_day]
     baseline = {
         "hrv": mean([hrv(w) for w in prev14]),
@@ -1034,6 +1060,24 @@ def main():
     planned_loads = [load(e) for e in today_events if load(e) is not None]
     planned_load = sum(planned_loads) if planned_loads else None
 
+    reported_fitness_today = ctl(today_w)
+    reported_fatigue_today = atl(today_w)
+    reported_form_today = form(today_w)
+
+    readiness_fitness = pre_workout_value(today_w, yesterday_w, ctl, planned_load, bool(done_today))
+    readiness_fatigue = pre_workout_value(today_w, yesterday_w, atl, planned_load, bool(done_today))
+    readiness_form = form_from_ctl_atl(readiness_fitness, readiness_fatigue)
+    if readiness_form is None:
+        readiness_form = pre_workout_value(today_w, yesterday_w, form, planned_load, bool(done_today))
+
+    metrics_projected_after_planned = bool(
+        planned_load and planned_load > 0 and not done_today and (
+            readiness_form != reported_form_today
+            or readiness_fatigue != reported_fatigue_today
+            or readiness_fitness != reported_fitness_today
+        )
+    )
+
     context = {
         "date": target.isoformat(),
         "athlete": {"id": athlete.get("id"), "name": athlete.get("name")},
@@ -1042,9 +1086,18 @@ def main():
             "sleep_score": sleep_score(today_w),
             "hrv": hrv(today_w),
             "resting_hr": rhr(today_w),
-            "fitness_ctl": ctl(today_w),
-            "fatigue_atl": atl(today_w),
-            "form": form(today_w),
+            "fitness_ctl": reported_fitness_today,
+            "fatigue_atl": reported_fatigue_today,
+            "form": reported_form_today,
+            "readiness_fitness_ctl": readiness_fitness,
+            "readiness_fatigue_atl": readiness_fatigue,
+            "readiness_form": readiness_form,
+            "metrics_are_projected_after_planned": metrics_projected_after_planned,
+        },
+        "yesterday_metrics": {
+            "fitness_ctl": ctl(yesterday_w),
+            "fatigue_atl": atl(yesterday_w),
+            "form": form(yesterday_w),
         },
         "baseline_14d": baseline,
         "recent_3d": {"load": recent_load, "hours": recent_hours},
