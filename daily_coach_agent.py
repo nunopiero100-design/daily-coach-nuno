@@ -508,7 +508,7 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
     return {"status": status, "reasons": reasons, "actions": actions, "source": "heuristic"}
 
 
-COACH_SYSTEM_VERSION = "v7.34"
+COACH_SYSTEM_VERSION = "v7.35"
 
 
 def clamp(n, low, high):
@@ -624,13 +624,66 @@ def first_action(actions, prefix="Plano normal"):
     return str((actions or ["n/d"])[0])
 
 
-def recovery_action(actions):
+def short_fueling_line(context):
+    """One-line fueling summary for the short TXT report."""
+    context = context or {}
+    planned = context.get("planned_events_today", []) or []
+    done_today = context.get("done_today_summary", {}) or {}
+    recent_3d = context.get("recent_3d", {}) or {}
+    yesterday = ((context.get("yesterday") or {}).get("compliance") or {})
+
+    if done_today.get("has_activity"):
+        return "Recuperação/fueling: pós-treino com 30–40 g proteína + hidratos suficientes; hidratação/eletrólitos."
+
+    y_done_load = yesterday.get("done_load") or 0
+    y_done_hours = yesterday.get("done_hours") or 0
+    recent_load = recent_3d.get("load") or 0
+    big_recent = y_done_load >= 150 or y_done_hours >= 3.0 or recent_load >= 300
+
+    if not planned:
+        if big_recent:
+            return "Recuperação/fueling: proteína 150–170 g; hidratos moderados; hidratação/eletrólitos. Sem défice agressivo."
+        return "Recuperação/fueling: proteína suficiente e hidratação. Défice leve só se energia/fome estiverem ok."
+
+    e = planned[0] or {}
+    name = str(e.get("name") or "").lower()
+    h = e.get("hours") or 0
+    l = e.get("load") or 0
+
+    easy_terms = ["zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"]
+    quality_terms = ["sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under", "burst", "sprint", "test", "race"]
+
+    has_easy = any(t in name for t in easy_terms)
+    has_quality = any(t in name for t in quality_terms)
+    is_pure_easy = has_easy and not has_quality
+    is_quality = has_quality or (l >= 80 and not is_pure_easy)
+
+    if is_pure_easy:
+        if h >= 2.0:
+            return "Recuperação/fueling: 40–60 g/h; água/eletrólitos. Proteína suficiente no dia."
+        if h >= 1.25:
+            return "Recuperação/fueling: 30–45 g/h se precisares; água/eletrólitos. Proteína suficiente no dia."
+        return "Recuperação/fueling: água/eletrólitos; hidratos só se fores vazio. Proteína suficiente no dia."
+
+    if is_quality:
+        if h >= 1.25:
+            return "Recuperação/fueling: 50–70 g/h; água/eletrólitos. 30–40 g proteína no pós."
+        return "Recuperação/fueling: 30–45 g total se precisares; água/eletrólitos. Proteína no pós."
+
+    if h >= 2.0 or l >= 100:
+        return "Recuperação/fueling: 40–70 g/h conforme intensidade; água/eletrólitos. Proteína suficiente no dia."
+
+    return "Recuperação/fueling: ajustar ao treino; proteína suficiente e hidratação."
+
+
+def recovery_action(actions, context=None):
     for a in actions or []:
         s = str(a)
         low = s.lower()
         if low.startswith(("recuperação/fueling", "recuperacao/fueling", "fueling:", "priorizar recuperação")):
-            return s
-    return "Recuperação/fueling: ajustar ao treino; proteína suficiente e hidratação."
+            if "ajustar ao treino" not in low:
+                return s
+    return short_fueling_line(context)
 
 
 def clean_action_line(action):
@@ -1068,7 +1121,8 @@ def main():
     lines.append(f"Sono: {fmt_h(tm.get('sleep_hours'))} | score {fmt(tm.get('sleep_score'),0)}")
     lines.append(f"HRV: {fmt(tm.get('hrv'))} vs {fmt(bl.get('hrv'))}")
     lines.append(f"RHR: {fmt(tm.get('resting_hr'),0)} vs {fmt(bl.get('rhr'),0)}")
-    lines.append(f"Form: {fmt(tm.get('form'),0)}")
+    form_for_report = tm.get("readiness_form") if tm.get("readiness_form") is not None else tm.get("form")
+    lines.append(f"Form pré-treino: {fmt(form_for_report,0)}")
     lines.append(f"Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
     lines.append("")
     lines.append("DECISÃO")
@@ -1084,7 +1138,7 @@ def main():
     lines.append(clean_action_line(first_action(decision.get("actions", []))))
     lines.append("")
     lines.append("FUELING")
-    lines.append(clean_action_line(recovery_action(decision.get("actions", []))))
+    lines.append(clean_action_line(recovery_action(decision.get("actions", []), context)))
     lines.append("")
     lines.append("INTERVALS")
     if applied:
