@@ -508,7 +508,7 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
     return {"status": status, "reasons": reasons, "actions": actions, "source": "heuristic"}
 
 
-COACH_SYSTEM_VERSION = "v7.35"
+COACH_SYSTEM_VERSION = "v7.36"
 
 
 def clamp(n, low, high):
@@ -693,6 +693,49 @@ def clean_action_line(action):
     s = re.sub(r"^Recuperação/fueling:\s*", "", s, flags=re.I)
     s = re.sub(r"^Recuperacao/fueling:\s*", "", s, flags=re.I)
     return s
+
+
+def report_form_pre_treino(tm):
+    """Prefer true pre-workout Form from readiness CTL/ATL for the short report."""
+    tm = tm or {}
+    c = tm.get("readiness_fitness_ctl")
+    a = tm.get("readiness_fatigue_atl")
+    if c is not None and a is not None:
+        try:
+            return float(c) - float(a)
+        except Exception:
+            pass
+    if tm.get("readiness_form") is not None:
+        return tm.get("readiness_form")
+    return tm.get("form")
+
+
+def is_pure_easy_planned(context):
+    planned = (context or {}).get("planned_events_today", []) or []
+    if not planned:
+        return False
+    e = planned[0] or {}
+    name = str(e.get("name") or "").lower()
+    easy_terms = ["zone 2", "z2", "endurance", "recovery", "recuper", "easy", "facil", "fácil"]
+    quality_terms = ["sweet spot", "threshold", "tempo", "vo2", "interval", "over", "under", "burst", "sprint", "test", "race"]
+    return any(t in name for t in easy_terms) and not any(t in name for t in quality_terms)
+
+
+def primary_action_for_report(decision, context):
+    """One-line action for the short TXT report."""
+    status = (decision or {}).get("status")
+    planned = (context or {}).get("planned_events_today", []) or []
+    if planned and is_pure_easy_planned(context) and status in ("VERDE", "AMARELO"):
+        e = planned[0] or {}
+        h = e.get("hours") or 0
+        try:
+            mins = int(round(float(h) * 60))
+        except Exception:
+            mins = 90
+        if status == "AMARELO":
+            return f"{mins} min Z2/recovery muito fácil. HR baixa, RPE baixo, sem perseguir TSS."
+        return f"{mins} min Z2 real. HR controlada, RPE baixo, sem perseguir TSS."
+    return clean_action_line(first_action((decision or {}).get("actions", [])))
 
 
 
@@ -1121,7 +1164,7 @@ def main():
     lines.append(f"Sono: {fmt_h(tm.get('sleep_hours'))} | score {fmt(tm.get('sleep_score'),0)}")
     lines.append(f"HRV: {fmt(tm.get('hrv'))} vs {fmt(bl.get('hrv'))}")
     lines.append(f"RHR: {fmt(tm.get('resting_hr'),0)} vs {fmt(bl.get('rhr'),0)}")
-    form_for_report = tm.get("readiness_form") if tm.get("readiness_form") is not None else tm.get("form")
+    form_for_report = report_form_pre_treino(tm)
     lines.append(f"Form pré-treino: {fmt(form_for_report,0)}")
     lines.append(f"Últimos 3 dias: {fmt(context['recent_3d'].get('load'),0)} TSS | {fmt_h(context['recent_3d'].get('hours'))}")
     lines.append("")
@@ -1135,7 +1178,7 @@ def main():
             lines += [f"- {r}" for r in reasons]
     lines.append("")
     lines.append("AÇÃO")
-    lines.append(clean_action_line(first_action(decision.get("actions", []))))
+    lines.append(primary_action_for_report(decision, context))
     lines.append("")
     lines.append("FUELING")
     lines.append(clean_action_line(recovery_action(decision.get("actions", []), context)))
