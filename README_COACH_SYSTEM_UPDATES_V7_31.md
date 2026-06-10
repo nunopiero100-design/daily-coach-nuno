@@ -1,45 +1,37 @@
-# Coach System Updates v7.31
+# Coach System Updates v7.31 VO2 + Score Patch
 
-Pequena adição ao Daily Coach: Coach Recovery Score.
+Patch mínimo sobre a v7.31.
 
-## Objetivo
+## Correção
 
-Adicionar um score simples tipo readiness/recuperação, sem alterar a decisão do Daily.
+Esta versão volta à base v7.31 e mexe apenas em dois pontos.
 
-## O que muda no relatório
+Motivo:
+- Em dias VO2, as alternativas de 60/45 min podiam sair como tempo/Sweet Spot.
+- O `Coach Recovery Score` aparecia na secção `DADOS`, mas o objetivo é ficar junto da `DECISÃO`.
 
-Na secção DADOS aparece uma nova linha:
+## Novo comportamento
 
-`Coach Recovery Score: XX/100 | VERDE/AMARELO/VERMELHO`
+Quando o treino planeado é VO2:
+- 60 min passa a versão curta de VO2, por exemplo 3x3 ou 3x4.
+- 45 min passa a versão mínima de VO2, por exemplo 2x3 ou 2x4.
+- A linha `Se for indoor/rolo` mantém estrutura VO2 ou versão curta VO2.
+- Não sugere tempo/Sweet Spot em dias VO2.
 
-## Importante
+Na secção `DECISÃO`, passa a aparecer:
 
-Este score NÃO muda a decisão do treino.
+- `Coach Recovery Score: XX/100 | VERDE/AMARELO/VERMELHO`
+- `Estado: VERDE/AMARELO/VERMELHO`
 
-A lógica continua igual:
+## Mantido da v7.31
 
-- Daily decide VERDE/AMARELO/VERMELHO como antes;
-- o score é apenas uma leitura rápida de recuperação;
-- OpenAI não usa este score para decidir, porque ele é calculado depois da decisão.
+- Relatório longo original.
+- Bloco `DADOS`.
+- Bloco `PESO / FUELING`.
+- Motivos e ações completos.
+- Lógica de Intervals/upload.
+- Weekly não foi alterado.
 
-## Fórmula geral
-
-Score composto por:
-
-- HRV vs baseline;
-- resting HR vs baseline;
-- sleep score / sono;
-- carga recente, Form e ontem vs planeado.
-
-## Labels
-
-- 75–100: VERDE
-- 60–74: AMARELO LEVE
-- 45–59: AMARELO
-- <45: VERMELHO
-
-## Ficheiro alterado
+## Ficheiros alterados
 
 - `daily_coach_agent.py`
-
-Weekly não foi alterado.
