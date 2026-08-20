@@ -2,6 +2,7 @@ import datetime as dt
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.apply import ApplyError, apply_for_today, preview_apply_for_today
@@ -21,6 +22,21 @@ app = FastAPI(
     version="0.1.0",
     description="API local para servir relatórios estruturados do Daily Coach.",
 )
+
+# Without this, the mobile app's WebView (a different origin from this API)
+# gets its requests silently blocked by the browser's CORS policy - the HTTP
+# call can even succeed server-side, but the app never gets to read the
+# response. allow_origins=["*"] is fine here: every route (except /health)
+# is still gated by a Bearer token, so an open CORS policy doesn't expose
+# anything - it just stops the browser from blocking legitimate calls.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class FeedbackRequest(BaseModel):
     date: dt.date
