@@ -21,6 +21,11 @@ function fmtMin(m) {
   return h > 0 ? `${h}h${mm ? mm + 'm' : ''}` : `${mm}m`;
 }
 
+function fmtNum(v, digits = 0) {
+  if (v == null || Number.isNaN(v)) return 'n/d';
+  return Number(v).toFixed(digits);
+}
+
 export default function TodayScreen({ useMock }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
@@ -143,15 +148,15 @@ export default function TodayScreen({ useMock }) {
         <div className="kv"><span className="k">Sono</span><span className="v">{fmtMin(Math.round((rd.sleep_hours || 0) * 60))}</span></div>
         <div className="kv"><span className="k">HRV</span><span className="v">{rd.hrv ?? 'n/d'}</span></div>
         <div className="kv"><span className="k">Resting HR</span><span className="v">{rd.resting_hr ?? 'n/d'} bpm</span></div>
-        <div className="kv"><span className="k">Fitness / Fatigue</span><span className="v">{rd.fitness_ctl ?? 'n/d'} / {rd.fatigue_atl ?? 'n/d'}</span></div>
-        <div className="kv"><span className="k">Form</span><span className="v">{rd.form ?? 'n/d'}</span></div>
+        <div className="kv"><span className="k">Fitness / Fatigue</span><span className="v">{fmtNum(rd.fitness_ctl)} / {fmtNum(rd.fatigue_atl)}</span></div>
+        <div className="kv"><span className="k">Form</span><span className="v">{fmtNum(rd.form)}</span></div>
       </div>
 
       <div className="card">
         <div className="sub" style={{ marginBottom: 8 }}>PESO</div>
-        <div className="kv"><span className="k">Hoje</span><span className="v">{w.current_kg ?? 'n/d'} kg</span></div>
-        <div className="kv"><span className="k">Média 7d</span><span className="v">{w.avg_7d_kg ?? 'n/d'} kg</span></div>
-        <div className="kv"><span className="k">Objetivo</span><span className="v">{w.target_kg ?? 'n/d'} kg</span></div>
+        <div className="kv"><span className="k">Hoje</span><span className="v">{fmtNum(w.current_kg, 1)} kg</span></div>
+        <div className="kv"><span className="k">Média 7d</span><span className="v">{fmtNum(w.avg_7d_kg, 1)} kg</span></div>
+        <div className="kv"><span className="k">Objetivo</span><span className="v">{fmtNum(w.target_kg, 1)} kg</span></div>
       </div>
 
       <div className="card lead">
