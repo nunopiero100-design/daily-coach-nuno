@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
-import { getTodayReport, sendFeedback, getApplyPreview, applyToday, ApiError } from '../api/client';
+import { useState } from 'react';
+import { sendFeedback, getApplyPreview, applyToday, ApiError } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
-import mockReport from '../mock/todayReport.json';
 
 const FEEDBACK_OPTIONS = [
   { type: 'NO_TIME', label: 'Sem tempo' },
@@ -26,35 +25,13 @@ function fmtNum(v, digits = 0) {
   return Number(v).toFixed(digits);
 }
 
-export default function TodayScreen({ useMock }) {
-  const [report, setReport] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function TodayScreen({ useMock, report, loading, error, reload }) {
   const [sentFeedback, setSentFeedback] = useState(null);
 
   // Apply-flow state: idle -> previewing -> confirming -> applied/failed
   const [applyState, setApplyState] = useState('idle');
   const [preview, setPreview] = useState(null);
   const [applyError, setApplyError] = useState(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (useMock) {
-        setReport(mockReport);
-      } else {
-        const data = await getTodayReport();
-        setReport(data);
-      }
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Erro a carregar o relatório.');
-    } finally {
-      setLoading(false);
-    }
-  }, [useMock]);
-
-  useEffect(() => { load(); }, [load]);
 
   async function handleFeedback(type) {
     setSentFeedback(type);
@@ -110,7 +87,7 @@ export default function TodayScreen({ useMock }) {
       <div className="center-msg">
         {error}
         <div style={{ marginTop: 14 }}>
-          <button className="icon-btn" onClick={load}>Tentar novamente</button>
+          <button className="icon-btn" onClick={reload}>Tentar novamente</button>
         </div>
       </div>
     );

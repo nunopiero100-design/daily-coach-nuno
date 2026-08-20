@@ -10,6 +10,8 @@ so backend/storage.py can just delegate here when DATABASE_URL is set:
   first - ReportRef below is a minimal stand-in so callers written for
   Path objects (e.g. api.py's `path.stem`) work unchanged.
 """
+import json
+
 from psycopg2.extras import Json
 
 from backend.db import ensure_schema, get_connection
@@ -74,3 +76,49 @@ def list_daily_reports_db() -> list[ReportRef]:
         conn.close()
 
     return [ReportRef(r[0].isoformat()) for r in rows]
+
+
+def save_feedback_db(feedback) -> str:
+    conn = get_connection()
+    try:
+        ensure_schema(conn)
+        payload = json.loads(feedback.model_dump_json())
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into feedback_entries (feedback_date, feedback_type, note, payload)
+                values (%s, %s, %s, %s);
+                """,
+                (feedback.date.isoformat(), feedback.type, feedback.note, Json(payload)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return f"postgres:feedback_entries:{feedback.date.isoformat()}"
+
+
+def load_feedback_for_date_db(feedback_date: str) -> list[dict]:
+    conn = get_connection()
+    try:
+        ensure_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                "select payload from feedback_entries where feedback_date = %s order by created_at;",
+                (feedback_date,),
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [r[0] for r in rows]
+
+
+def list_feedback_db() -> list[dict]:
+    conn = get_connection()
+    try:
+        ensure_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute("select payload from feedback_entries order by feedback_date desc, created_at desc;")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [r[0] for r in rows]

@@ -71,8 +71,8 @@ export function getReportByDate(date) {
   return request(`/api/v1/reports/${date}`);
 }
 
-export function listReports() {
-  return request('/api/v1/reports');
+export function listReports(limit = 14) {
+  return request(`/api/v1/reports?limit=${limit}`);
 }
 
 export function sendFeedback(feedbackType, note) {

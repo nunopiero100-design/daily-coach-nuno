@@ -15,6 +15,7 @@ FeedbackType = Literal[
     "MANUAL_NOTE",
 ]
 
+from backend.db import is_postgres_configured
 from backend.paths import get_feedback_dir
 
 DEFAULT_FEEDBACK_DIR = get_feedback_dir()
@@ -31,6 +32,10 @@ def save_feedback(
     feedback: FeedbackEntry,
     feedback_dir: Path | str = DEFAULT_FEEDBACK_DIR,
 ) -> Path:
+    if is_postgres_configured():
+        from backend.postgres_storage import save_feedback_db
+        return save_feedback_db(feedback)
+
     feedback_path = Path(feedback_dir)
     feedback_path.mkdir(parents=True, exist_ok=True)
 
@@ -54,6 +59,10 @@ def load_feedback_for_date(
     feedback_date: str,
     feedback_dir: Path | str = DEFAULT_FEEDBACK_DIR,
 ) -> list[dict]:
+    if is_postgres_configured():
+        from backend.postgres_storage import load_feedback_for_date_db
+        return load_feedback_for_date_db(feedback_date)
+
     feedback_path = Path(feedback_dir)
     input_path = feedback_path / f"{feedback_date}.json"
 
@@ -66,6 +75,10 @@ def load_feedback_for_date(
 def list_feedback(
     feedback_dir: Path | str = DEFAULT_FEEDBACK_DIR,
 ) -> list[dict]:
+    if is_postgres_configured():
+        from backend.postgres_storage import list_feedback_db
+        return list_feedback_db()
+
     feedback_path = Path(feedback_dir)
 
     if not feedback_path.exists():

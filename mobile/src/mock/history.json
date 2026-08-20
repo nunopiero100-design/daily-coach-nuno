@@ -1,0 +1,12 @@
+{
+  "count": 7,
+  "reports": [
+    {"date": "2026-08-20", "status": "YELLOW", "title": "Faz o threshold em versão reduzida", "readiness": {"form": -14.4}},
+    {"date": "2026-08-19", "status": "YELLOW", "title": "Endurance controlado, protege recuperação", "readiness": {"form": -13.0}},
+    {"date": "2026-08-18", "status": "GREEN", "title": "Fazer o treino planeado como está", "readiness": {"form": -3.0}},
+    {"date": "2026-08-17", "status": "GREEN", "title": "Fazer o treino planeado como está", "readiness": {"form": 2.0}},
+    {"date": "2026-08-16", "status": "GREEN", "title": "Fazer o treino planeado como está", "readiness": {"form": 5.0}},
+    {"date": "2026-08-15", "status": "YELLOW", "title": "Reduzir intensidade, carga acumulada", "readiness": {"form": -18.0}},
+    {"date": "2026-08-14", "status": "RED", "title": "Recovery total, sem treino de qualidade", "readiness": {"form": -28.0}}
+  ]
+}

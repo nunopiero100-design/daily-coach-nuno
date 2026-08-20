@@ -838,7 +838,7 @@ def choose_replacement_kind(status, planned_name):
     return "yellow_endurance"
 
 
-def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=None):
+def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=None, yesterday_feedback=None):
     reasons, actions = [], []
     score = 0
 
@@ -905,6 +905,23 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
         reasons.append("Ontem havia treino planeado, mas não foi realizado. Treino perdido não vira dívida; não compensar automaticamente.")
     elif y_status in ("PARCIAL / MAIS LEVE", "MUITO ABAIXO DO PLANO"):
         reasons.append(f"Ontem ficou abaixo do planeado ({y_status}). Não compensar à força; ajustar pelo estado de hoje.")
+
+    feedback_types = {f.get("type") for f in (yesterday_feedback or [])}
+    if "SICK" in feedback_types:
+        score += 4
+        reasons.append("Reportaste estar doente ontem - hoje trata com mais cautela mesmo que HRV/sono pareçam normais; sintomas podem preceder a queda nos sinais.")
+    if "INJURED" in feedback_types:
+        score += 4
+        reasons.append("Reportaste uma lesão ontem - prioriza recuperação e evita agravar; considera evitar o treino planeado.")
+    if "NO_TIME" in feedback_types:
+        reasons.append("Reportaste falta de tempo ontem - o treino perdido não é para compensar hoje.")
+    if "RAIN_INDOOR" in feedback_types:
+        reasons.append("Reportaste chuva/indoor ontem - contexto explicativo, não penaliza hoje.")
+    if "NO_BIKE_WEEK" in feedback_types:
+        reasons.append("Reportaste ser uma semana sem bike - considera uma alternativa fora da bicicleta se aplicável.")
+    for f in (yesterday_feedback or []):
+        if f.get("type") == "MANUAL_NOTE" and f.get("note"):
+            reasons.append(f"Nota manual de ontem: {f['note']}")
 
     if score >= 7:
         status = "VERMELHO"
@@ -1070,6 +1087,13 @@ Regras específicas:
      Não recomendar "reduzir 3%" nem "cortar um bloco" como plano principal.
      Plano principal deve ser substituir por 90–120 min Z2 fácil/endurance, sem blocos, ou descanso se houver fadiga.
    - Group ride em AMARELO forte só é aceitável se o atleta conseguir ficar em Z2 e cortar cedo.
+
+13. Feedback reportado pelo Nuno na app (yesterday.feedback):
+   - SICK (doente ontem): tratar com mais cautela mesmo que HRV/sono/RHR pareçam normais hoje - sintomas podem preceder a queda nos sinais objetivos. Inclinar para AMARELO/VERMELHO salvo evidência muito forte de recuperação.
+   - INJURED (lesão ontem): priorizar recuperação; considerar indoor_alternative mais suave ou descanso; não recomendar intensidade nova na zona lesionada.
+   - NO_TIME (sem tempo ontem) ou RAIN_INDOOR (chuva/indoor ontem): apenas contexto explicativo para o porquê de ontem ter ficado abaixo do planeado - NUNCA usar para justificar compensar volume hoje.
+   - NO_BIKE_WEEK: esta semana não é para bike; considerar alternativa fora da bicicleta se fizer sentido.
+   - MANUAL_NOTE: ler a nota e incorporar o contexto relevante na decisão e no resumo.
 
 13. Regra pós-treino grande:
    - Se ontem teve >=150 TSS, >=3h ou foi acima do planeado, e hoje não há treino planeado:
@@ -2057,6 +2081,34 @@ def build_alternate_event(original, target_date, status, decision_text, reasons,
 
 
 
+def fetch_yesterday_feedback(target_date):
+    """
+    Feedback submitted from the app lands on Render's backend, not on this
+    GitHub Actions runner - they're different machines. This fetches
+    yesterday's feedback over HTTP so today's decision can actually use it.
+    Best-effort: never raises, returns [] on any failure so a broken fetch
+    here can't break the rest of the run.
+    """
+    render_url = os.getenv("RENDER_API_URL", "").strip()
+    app_token = os.getenv("APP_TOKEN", "").strip()
+    if not render_url or not app_token:
+        return []
+    yesterday = target_date - dt.timedelta(days=1)
+    try:
+        r = requests.get(
+            f"{render_url.rstrip('/')}/api/v1/feedback",
+            params={"date": yesterday.isoformat()},
+            headers={"Authorization": f"Bearer {app_token}"},
+            timeout=20,
+        )
+        if r.ok:
+            return r.json().get("feedback", [])
+        print(f"Aviso: pedido de feedback falhou: HTTP {r.status_code}")
+    except Exception as e:
+        print(f"Aviso: falha ao obter feedback de ontem: {e}")
+    return []
+
+
 def push_structured_report_to_render(structured_report):
     """
     Best-effort push of today's structured report to the Render-hosted API,
@@ -2192,6 +2244,7 @@ def main():
     yesterday_events = events_on(events, yesterday)
     done_yesterday = completed_activities_on(activities, yesterday)
     yesterday_compliance = compliance_check(yesterday_events, done_yesterday)
+    yesterday_feedback = fetch_yesterday_feedback(target)
 
     planned_loads = [load(e) for e in today_events if load(e) is not None]
     planned_load = sum(planned_loads) if planned_loads else None
@@ -2252,6 +2305,7 @@ def main():
         "yesterday": {
             "date": yesterday.isoformat(),
             "compliance": yesterday_compliance,
+            "feedback": yesterday_feedback,
             "planned_events": [{"name": e.get("name"), "load": load(e), "hours": hours(e)} for e in yesterday_events],
             "completed_activities": [{"name": a.get("name"), "load": load(a), "hours": hours(a)} for a in done_yesterday],
         },
@@ -2295,7 +2349,7 @@ def main():
         weight_avg_7d=context["baseline_14d"].get("weight_7d"),
     )
 
-    heuristic = heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=readiness_form)
+    heuristic = heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_compliance, readiness_form=readiness_form, yesterday_feedback=yesterday_feedback)
 
     if missing_today_metrics:
         decision = {
