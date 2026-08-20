@@ -1,0 +1,64 @@
+import { useState } from 'react';
+import gymData from '../mock/gymPlan.json';
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_LABELS_PT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+export default function GymScreen() {
+  const todayIdx = new Date().getDay();
+  const todayName = DAY_NAMES[todayIdx];
+  const dayIndexForToday = gymData.gymmap[todayName];
+  const hasSessionToday = dayIndexForToday !== undefined;
+
+  const [selectedDay, setSelectedDay] = useState(
+    hasSessionToday ? dayIndexForToday : 0
+  );
+
+  const day = gymData.strength.days[selectedDay];
+
+  return (
+    <div>
+      <div className="card lead">
+        <div className="sub">GYM</div>
+        <div className="h1">{hasSessionToday ? 'Hoje tens ginásio' : DAY_LABELS_PT[todayIdx]}</div>
+        {!hasSessionToday && <div className="sub">Sem sessão de ginásio programada hoje.</div>}
+      </div>
+
+      <div className="feedback-row" style={{ gridTemplateColumns: `repeat(${gymData.strength.days.length}, 1fr)`, marginBottom: 14 }}>
+        {gymData.strength.days.map((d, i) => (
+          <button
+            key={i}
+            className="feedback-btn"
+            onClick={() => setSelectedDay(i)}
+            style={i === selectedDay ? { borderColor: 'var(--lime)', color: 'var(--lime)' } : undefined}
+          >
+            {d.title.split(' - ')[1] || d.title.split(' ')[0]}
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="sub" style={{ marginBottom: 10 }}>{day.title.toUpperCase()}</div>
+        {day.ex.map((e, i) => (
+          <div key={i} style={{ marginBottom: 14, paddingBottom: 12, borderBottom: i < day.ex.length - 1 ? '1px solid var(--card-border)' : 'none' }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{e.n}</div>
+            <div className="sub" style={{ margin: '4px 0 2px' }}>{e.sr} · {e.load}</div>
+            {e.note && <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{e.note}</div>}
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="sub" style={{ marginBottom: 8 }}>PROGRESSÃO</div>
+        <div style={{ fontSize: 13, lineHeight: 1.5 }}>{gymData.strength.progression}</div>
+      </div>
+
+      <div className="card">
+        <div className="sub" style={{ marginBottom: 8 }}>EVITAR (JOELHO)</div>
+        {gymData.strength.avoid.map((a, i) => (
+          <div key={i} className="action-line" style={{ marginBottom: 6 }}>{a}</div>
+        ))}
+      </div>
+    </div>
+  );
+}

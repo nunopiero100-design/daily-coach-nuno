@@ -82,8 +82,21 @@ export function sendFeedback(feedbackType, note) {
   });
 }
 
-export function healthCheck(baseUrl) {
-  return fetch(`${baseUrl.replace(/\/$/, '')}/health`).then((r) => r.ok);
+export async function healthCheck(baseUrl) {
+  if (!baseUrl) return { ok: false, detail: 'URL vazio.' };
+  const url = `${baseUrl.replace(/\/$/, '')}/health`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      return { ok: false, detail: `Servidor respondeu HTTP ${res.status} em ${url}` };
+    }
+    return { ok: true, detail: null };
+  } catch (e) {
+    // This is the branch that was showing as a generic "não foi possível
+    // ligar" before - now we surface the real browser/network error text
+    // (e.g. "Failed to fetch", a TLS error, a DNS error, etc.)
+    return { ok: false, detail: `${e?.message || e} (URL testada: ${url})` };
+  }
 }
 
 export { ApiError };

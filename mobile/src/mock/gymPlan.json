@@ -1,0 +1,149 @@
+{
+  "gymmap": {
+    "Mon": 0,
+    "Wed": 1,
+    "Fri": 2
+  },
+  "strength": {
+    "intro": "Three sessions a week at 08:30, paired with bike days (Mon Push, Wed Pull, Fri Legs). Built around your knee: posterior-chain bias (glutes/hamstrings) for climbing power and joint stability, controlled range, no impact or deep loaded knee flexion. Warm-up 8-10 min every session: easy bike/row + glute-bridge x15, band face-pulls x15, leg swings. Lift tempo controlled (about 2s down, 1s up); no grinding reps. Stop any movement that pinches or sharply hurts the knee and clear the leg day with your physio first.",
+    "progression": "Progression: when you hit the TOP of the rep range on every set with 1-2 reps still in the tank, add a little load next week (upper body ~2.5 kg, hinge/glute ~5 kg). In hard bike weeks keep strength at RPE 7-8 and don't chase PRs - it supports the riding, it doesn't compete with it. In taper (W13-14) cut strength volume ~40% and stop heavy lifting 5 days before the goal Saturday.",
+    "avoid": [
+      "Deep / loaded squats below parallel",
+      "Heavy seated leg extension (knee shear)",
+      "Jumping / plyometrics / box jumps",
+      "Lunging into deep knee flexion under load",
+      "Anything that pinches or sharply hurts the knee - swap it or skip it"
+    ],
+    "days": [
+      {
+        "title": "Monday - PUSH (upper)",
+        "ex": [
+          {
+            "n": "Incline DB press",
+            "sr": "4 x 8-10",
+            "load": "RPE 8 - rest 2-3 min",
+            "note": "Chest/shoulders. Full ROM, controlled."
+          },
+          {
+            "n": "Standing overhead press",
+            "sr": "3 x 6-8",
+            "load": "RPE 8 - rest 2-3 min",
+            "note": "Brace core, no lower-back arch."
+          },
+          {
+            "n": "Flat machine / DB press",
+            "sr": "3 x 10-12",
+            "load": "RPE 8 - rest 90s",
+            "note": "Pump, controlled tempo."
+          },
+          {
+            "n": "Lateral raises",
+            "sr": "3 x 12-15",
+            "load": "RPE 9 - rest 60s",
+            "note": "Light, strict, no swing."
+          },
+          {
+            "n": "Triceps rope pushdown",
+            "sr": "3 x 12-15",
+            "load": "RPE 9 - rest 60s",
+            "note": "Full lockout."
+          },
+          {
+            "n": "Plank + side plank",
+            "sr": "3 x 30-45s each",
+            "load": "bodyweight - rest 45s",
+            "note": "Core for a stable climbing posture."
+          }
+        ]
+      },
+      {
+        "title": "Wednesday - PULL (upper) + core",
+        "ex": [
+          {
+            "n": "Lat pulldown / assisted pull-up",
+            "sr": "4 x 8-10",
+            "load": "RPE 8 - rest 2-3 min",
+            "note": "Full stretch at top."
+          },
+          {
+            "n": "Seated cable row",
+            "sr": "3 x 10-12",
+            "load": "RPE 8 - rest 90s",
+            "note": "Squeeze shoulder blades, no torso swing."
+          },
+          {
+            "n": "Face pulls",
+            "sr": "3 x 15",
+            "load": "RPE 8 - rest 60s",
+            "note": "Posture / rear delts - big for road position."
+          },
+          {
+            "n": "Single-arm DB row",
+            "sr": "3 x 10 / side",
+            "load": "RPE 8 - rest 75s",
+            "note": "Control the lowering."
+          },
+          {
+            "n": "Biceps curls",
+            "sr": "3 x 12",
+            "load": "RPE 9 - rest 60s",
+            "note": "Strict."
+          },
+          {
+            "n": "Pallof press + dead bug",
+            "sr": "3 x 10 / side",
+            "load": "light band - rest 45s",
+            "note": "Anti-rotation core."
+          }
+        ]
+      },
+      {
+        "title": "Friday - LEGS (knee-safe) + glutes",
+        "ex": [
+          {
+            "n": "Romanian deadlift",
+            "sr": "4 x 8",
+            "load": "RPE 7-8 - rest 2-3 min",
+            "note": "Hip hinge, flat back, no knee strain - your main power lift."
+          },
+          {
+            "n": "Hip thrust / glute bridge",
+            "sr": "4 x 10-12",
+            "load": "RPE 8 - rest 2 min",
+            "note": "Pause + squeeze at top. Glute power for climbing."
+          },
+          {
+            "n": "Leg press (LIMITED depth)",
+            "sr": "3 x 12",
+            "load": "RPE 7 - rest 2 min",
+            "note": "Stop ABOVE 90 deg knee bend. Light-moderate only."
+          },
+          {
+            "n": "Seated hamstring curl",
+            "sr": "3 x 12-15",
+            "load": "RPE 8 - rest 75s",
+            "note": "Light, controlled - hamstring/knee support."
+          },
+          {
+            "n": "Low step-ups (15-20 cm box)",
+            "sr": "3 x 8 / leg",
+            "load": "bodyweight/light - rest 75s",
+            "note": "No deep bend; control the way down."
+          },
+          {
+            "n": "Standing calf raises",
+            "sr": "3 x 15",
+            "load": "RPE 8 - rest 60s",
+            "note": "Ankle stiffness for power transfer."
+          },
+          {
+            "n": "Bird-dog + glute-med band walks",
+            "sr": "3 x 12",
+            "load": "band - rest 45s",
+            "note": "Single-leg / knee-tracking stability."
+          }
+        ]
+      }
+    ]
+  }
+}

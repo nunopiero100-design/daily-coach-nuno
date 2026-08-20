@@ -5,6 +5,7 @@ export default function SettingsScreen({ useMock, setUseMock }) {
   const [baseUrl, setBaseUrl] = useState('');
   const [token, setToken] = useState('');
   const [status, setStatus] = useState(null);
+  const [testDetail, setTestDetail] = useState(null);
 
   useEffect(() => {
     getSettings().then((s) => {
@@ -20,12 +21,10 @@ export default function SettingsScreen({ useMock, setUseMock }) {
 
   async function handleTest() {
     setStatus('testing');
-    try {
-      const ok = baseUrl && (await healthCheck(baseUrl));
-      setStatus(ok ? 'ok' : 'fail');
-    } catch {
-      setStatus('fail');
-    }
+    setTestDetail(null);
+    const result = await healthCheck(baseUrl);
+    setStatus(result.ok ? 'ok' : 'fail');
+    setTestDetail(result.detail);
   }
 
   return (
@@ -56,7 +55,12 @@ export default function SettingsScreen({ useMock, setUseMock }) {
         {status === 'saved' && <div className="sub" style={{ color: 'var(--green)', marginTop: 8 }}>Guardado.</div>}
         {status === 'testing' && <div className="sub" style={{ marginTop: 8 }}>A testar…</div>}
         {status === 'ok' && <div className="sub" style={{ color: 'var(--green)', marginTop: 8 }}>Backend acessível ✓</div>}
-        {status === 'fail' && <div className="sub" style={{ color: 'var(--red)', marginTop: 8 }}>Não foi possível ligar.</div>}
+        {status === 'fail' && (
+          <div className="sub" style={{ color: 'var(--red)', marginTop: 8 }}>
+            Não foi possível ligar.
+            {testDetail && <div style={{ marginTop: 4, fontSize: 12, wordBreak: 'break-all' }}>{testDetail}</div>}
+          </div>
+        )}
       </div>
 
       <div className="card">

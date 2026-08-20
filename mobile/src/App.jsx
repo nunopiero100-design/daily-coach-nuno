@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TodayScreen from './screens/TodayScreen';
+import GymScreen from './screens/GymScreen';
 import SettingsScreen from './screens/SettingsScreen';
 
 export default function App() {
@@ -15,11 +16,13 @@ export default function App() {
 
       <div className="content">
         {tab === 'today' && <TodayScreen useMock={useMock} />}
+        {tab === 'gym' && <GymScreen />}
         {tab === 'settings' && <SettingsScreen useMock={useMock} setUseMock={setUseMock} />}
       </div>
 
       <div className="tabbar">
         <div className={`tab ${tab === 'today' ? 'on' : ''}`} onClick={() => setTab('today')}>Hoje</div>
+        <div className={`tab ${tab === 'gym' ? 'on' : ''}`} onClick={() => setTab('gym')}>Gym</div>
         <div className={`tab ${tab === 'settings' ? 'on' : ''}`} onClick={() => setTab('settings')}>Settings</div>
       </div>
     </div>
