@@ -1,6 +1,9 @@
 import datetime as dt
+import os
+import time
 from pathlib import Path
 
+import requests
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -87,14 +90,71 @@ def get_today_report(
         )
 
 
+# In-memory cooldown so a double-tap (or an accidental repeat) doesn't fire
+# the workflow twice in a row. Resets on redeploy/restart - fine for a
+# personal, low-frequency button; not meant to be a hard security control.
+_run_now_state = {"last_triggered_at": 0.0}
+RUN_NOW_COOLDOWN_SECONDS = 180
+
+GITHUB_OWNER = "nunopiero100-design"
+GITHUB_REPO = "daily-coach-nuno"
+GITHUB_WORKFLOW_FILE = "daily_coach.yml"
+
+
 @app.post("/api/v1/reports/run-now")
 def run_daily_coach_now(
     _: None = Depends(require_app_token),
 ):
+    """
+    Triggers the SAME GitHub Actions workflow that runs every morning,
+    on demand - rather than re-implementing daily_coach_agent.py's logic
+    (Intervals pull + OpenAI reasoning + ingest) a second time inside this
+    API process, which would need its own copies of INTERVALS_API_KEY,
+    OPENAI_API_KEY etc. and would duplicate an already-proven pipeline.
+
+    The workflow run itself still pushes its result to /reports/ingest
+    when it finishes (typically ~30-90s later), same as every scheduled
+    run - so the app should poll/refresh shortly after calling this,
+    not expect the fresh report immediately in this response.
+    """
+    now = time.time()
+    elapsed = now - _run_now_state["last_triggered_at"]
+    if elapsed < RUN_NOW_COOLDOWN_SECONDS:
+        wait = int(RUN_NOW_COOLDOWN_SECONDS - elapsed)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Já foi pedida uma atualização há pouco. Tenta novamente em ~{wait}s.",
+        )
+
+    github_token = os.getenv("GITHUB_TOKEN", "").strip()
+    if not github_token:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado no backend.")
+
+    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW_FILE}/dispatches"
+    try:
+        r = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {github_token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            json={"ref": "main"},
+            timeout=20,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro a contactar o GitHub: {e}")
+
+    if r.status_code != 204:
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub recusou o pedido: HTTP {r.status_code} {r.text[:200]}",
+        )
+
+    _run_now_state["last_triggered_at"] = now
     return {
-        "status": "not_implemented",
-        "message": "Run-now endpoint reserved for future Daily Coach execution.",
-        "next_step": "This will eventually trigger daily_coach_agent.py with rate limiting and safe execution.",
+        "status": "triggered",
+        "message": "Pedido enviado. Demora tipicamente ~30-90s a aparecer no relatório - atualiza daqui a pouco.",
     }
 
 

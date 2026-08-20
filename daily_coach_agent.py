@@ -914,7 +914,10 @@ def heuristic_decision(today_w, baseline, recent_load, planned_load, yesterday_c
         score += 4
         reasons.append("Reportaste uma lesão ontem - prioriza recuperação e evita agravar; considera evitar o treino planeado.")
     if "NO_TIME" in feedback_types:
-        reasons.append("Reportaste falta de tempo ontem - o treino perdido não é para compensar hoje.")
+        if (planned_load or 0) < 50:
+            reasons.append("Reportaste falta de tempo ontem e hoje é leve - podes considerar fazer o treino perdido em vez de descanso total, se apetecer.")
+        else:
+            reasons.append("Reportaste falta de tempo ontem - hoje já tem o seu próprio treino, não acumules os dois.")
     if "RAIN_INDOOR" in feedback_types:
         reasons.append("Reportaste chuva/indoor ontem - contexto explicativo, não penaliza hoje.")
     if "NO_BIKE_WEEK" in feedback_types:
@@ -1091,7 +1094,9 @@ Regras específicas:
 13. Feedback reportado pelo Nuno na app (yesterday.feedback):
    - SICK (doente ontem): tratar com mais cautela mesmo que HRV/sono/RHR pareçam normais hoje - sintomas podem preceder a queda nos sinais objetivos. Inclinar para AMARELO/VERMELHO salvo evidência muito forte de recuperação.
    - INJURED (lesão ontem): priorizar recuperação; considerar indoor_alternative mais suave ou descanso; não recomendar intensidade nova na zona lesionada.
-   - NO_TIME (sem tempo ontem) ou RAIN_INDOOR (chuva/indoor ontem): apenas contexto explicativo para o porquê de ontem ter ficado abaixo do planeado - NUNCA usar para justificar compensar volume hoje.
+   - NO_TIME (sem tempo ontem) ou RAIN_INDOOR (chuva/indoor ontem): olhar para o treino planeado de HOJE (planned_workout).
+     * Se hoje é genuinamente descanso/fácil/baixa carga: podes OFERECER o treino que faltou ontem como opção hoje em vez de puro descanso - nomeia-o explicitamente (ex: "ontem faltou X; hoje é livre, se quiseres podes fazer X em vez de descanso total"). Isto é uma opção, não uma obrigação, e o Nuno decide.
+     * Se hoje já tem a sua própria sessão de qualidade/dura planeada: NÃO tentes encaixar as duas. Segue o plano de hoje (ou reduz, se a Form justificar) e deixa o treino perdido de ontem por fazer - nunca acumules duas sessões duras por causa de uma perdida.
    - NO_BIKE_WEEK: esta semana não é para bike; considerar alternativa fora da bicicleta se fizer sentido.
    - MANUAL_NOTE: ler a nota e incorporar o contexto relevante na decisão e no resumo.
 
