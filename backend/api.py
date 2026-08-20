@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.apply import ApplyError, apply_for_today, preview_apply_for_today
 from backend.auth import require_app_token
 from backend.feedback import (
     FeedbackEntry,
@@ -78,6 +79,39 @@ def run_daily_coach_now(
         "message": "Run-now endpoint reserved for future Daily Coach execution.",
         "next_step": "This will eventually trigger daily_coach_agent.py with rate limiting and safe execution.",
     }
+
+
+@app.get("/api/v1/reports/today/apply/preview")
+def get_apply_preview(
+    _: None = Depends(require_app_token),
+):
+    """
+    Shows what the 'Apply reduced workout' button WOULD do, without writing
+    anything to Intervals.icu. The app should always call this first and let
+    the person confirm before calling the POST endpoint below.
+    """
+    try:
+        return preview_apply_for_today()
+    except ApplyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Sem relatório para hoje.")
+
+
+@app.post("/api/v1/reports/today/apply")
+def post_apply_today(
+    _: None = Depends(require_app_token),
+):
+    """
+    Actually replaces today's planned workout on Intervals.icu with the
+    reduced/recovery version. Only valid when today's status is YELLOW or RED.
+    """
+    try:
+        return apply_for_today()
+    except ApplyError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Sem relatório para hoje.")
 
 
 @app.get("/api/v1/reports/{report_date}")
