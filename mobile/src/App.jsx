@@ -3,12 +3,10 @@ import TodayScreen from './screens/TodayScreen';
 import GymScreen from './screens/GymScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { getTodayReport, ApiError } from './api/client';
-import mockReport from './mock/todayReport.json';
+import { getTodayReport, runNow, ApiError } from './api/client';
 
 export default function App() {
   const [tab, setTab] = useState('today');
-  const [useMock, setUseMock] = useState(true); // starts in mock mode until the ingest bridge exists
 
   // Today's report is fetched once here and shared by Today + Gym, so the
   // Gym tab can react to readiness too without a second network call.
@@ -20,32 +18,73 @@ export default function App() {
     setReportLoading(true);
     setReportError(null);
     try {
-      if (useMock) {
-        setReport(mockReport);
-      } else {
-        const data = await getTodayReport();
-        setReport(data);
-      }
+      const data = await getTodayReport();
+      setReport(data);
     } catch (e) {
       setReportError(e instanceof ApiError ? e.message : 'Erro a carregar o relatório.');
     } finally {
       setReportLoading(false);
     }
-  }, [useMock]);
+  }, []);
 
   useEffect(() => { loadReport(); }, [loadReport]);
+
+  // Reload = trigger a fresh Daily Coach run on GitHub Actions (pulls latest
+  // Intervals.icu/wellness data, not just re-reads what's already stored).
+  // The result lands a bit later via the same ingest path as every morning,
+  // so this doesn't refresh `report` immediately - it just kicks off the run.
+  const [runState, setRunState] = useState('idle'); // idle | running | done | error
+  const [runMessage, setRunMessage] = useState(null);
+
+  async function handleRunNow() {
+    setRunState('running');
+    setRunMessage(null);
+    try {
+      const res = await runNow();
+      setRunState('done');
+      setRunMessage(res.message);
+    } catch (e) {
+      setRunState('error');
+      setRunMessage(e instanceof ApiError ? e.message : 'Não foi possível pedir a atualização.');
+    }
+  }
 
   return (
     <div className="app">
       <div className="topbar">
         <div className="brand">DAILY<span className="dot">·</span>COACH</div>
-        {useMock && <span className="status-badge INCOMPLETE">MOCK</span>}
+        <button
+          className="icon-btn"
+          onClick={handleRunNow}
+          disabled={runState === 'running'}
+          title="Pedir uma atualização a partir do Intervals.icu"
+        >
+          {runState === 'running' ? '…' : '⟳ Atualizar'}
+        </button>
       </div>
+
+      {runMessage && (
+        <div
+          className="card"
+          style={{
+            margin: '0 16px 10px',
+            borderLeft: `4px solid ${runState === 'error' ? 'var(--red)' : 'var(--lime)'}`,
+          }}
+        >
+          <div className="sub" style={{ color: runState === 'error' ? 'var(--red)' : 'var(--text)' }}>
+            {runMessage}
+          </div>
+          {runState === 'done' && (
+            <button className="icon-btn" style={{ marginTop: 8 }} onClick={loadReport}>
+              Verificar agora
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="content">
         {tab === 'today' && (
           <TodayScreen
-            useMock={useMock}
             report={report}
             loading={reportLoading}
             error={reportError}
@@ -53,8 +92,8 @@ export default function App() {
           />
         )}
         {tab === 'gym' && <GymScreen report={report} />}
-        {tab === 'history' && <HistoryScreen useMock={useMock} />}
-        {tab === 'settings' && <SettingsScreen useMock={useMock} setUseMock={setUseMock} />}
+        {tab === 'history' && <HistoryScreen />}
+        {tab === 'settings' && <SettingsScreen />}
       </div>
 
       <div className="tabbar">

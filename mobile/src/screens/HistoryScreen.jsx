@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listReports, ApiError } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
-import mockHistory from '../mock/history.json';
 
 const STATUS_COLOR = { GREEN: '#4fd67a', YELLOW: '#f0c14b', RED: '#f0574b', INCOMPLETE: '#8b96a3' };
 
@@ -41,7 +40,7 @@ function FormSparkline({ reports }) {
   );
 }
 
-export default function HistoryScreen({ useMock }) {
+export default function HistoryScreen() {
   const [reports, setReports] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,12 +50,8 @@ export default function HistoryScreen({ useMock }) {
       setLoading(true);
       setError(null);
       try {
-        if (useMock) {
-          setReports(mockHistory.reports);
-        } else {
-          const data = await listReports(14);
-          setReports(data.reports || []);
-        }
+        const data = await listReports(14);
+        setReports(data.reports || []);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : 'Erro a carregar o histórico.');
       } finally {
@@ -64,7 +59,7 @@ export default function HistoryScreen({ useMock }) {
       }
     }
     load();
-  }, [useMock]);
+  }, []);
 
   if (loading) return <div className="center-msg">A carregar…</div>;
   if (error) return <div className="center-msg">{error}</div>;

@@ -50,9 +50,20 @@ async function request(path, { method = 'GET', body } = {}) {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new ApiError(`Erro do servidor (${res.status}): ${text.slice(0, 200)}`, res.status);
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.detail) detail = parsed.detail;
+    } catch {
+      // not JSON, use the raw text as-is
+    }
+    throw new ApiError(detail || `Erro do servidor (${res.status})`, res.status);
   }
   return res.json();
+}
+
+export function runNow() {
+  return request('/api/v1/reports/run-now', { method: 'POST' });
 }
 
 export function getTodayReport() {

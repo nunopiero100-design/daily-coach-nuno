@@ -25,7 +25,7 @@ function fmtNum(v, digits = 0) {
   return Number(v).toFixed(digits);
 }
 
-export default function TodayScreen({ useMock, report, loading, error, reload }) {
+export default function TodayScreen({ report, loading, error, reload }) {
   const [sentFeedback, setSentFeedback] = useState(null);
 
   // Apply-flow state: idle -> previewing -> confirming -> applied/failed
@@ -35,12 +35,10 @@ export default function TodayScreen({ useMock, report, loading, error, reload })
 
   async function handleFeedback(type) {
     setSentFeedback(type);
-    if (!useMock) {
-      try {
-        await sendFeedback(type);
-      } catch (e) {
-        console.warn('Feedback failed', e);
-      }
+    try {
+      await sendFeedback(type);
+    } catch (e) {
+      console.warn('Feedback failed', e);
     }
   }
 
@@ -48,18 +46,8 @@ export default function TodayScreen({ useMock, report, loading, error, reload })
     setApplyError(null);
     setApplyState('previewing');
     try {
-      if (useMock) {
-        // Fake a preview in mock mode so the flow is testable offline.
-        setPreview({
-          original_name: report.planned_workout?.name,
-          new_name: `AJUSTADO — versão reduzida (${report.planned_workout?.name})`,
-          new_load: Math.round((report.planned_workout?.planned_tss || 0) * 0.65),
-          duration_minutes: report.planned_workout?.duration_minutes,
-        });
-      } else {
-        const p = await getApplyPreview();
-        setPreview(p);
-      }
+      const p = await getApplyPreview();
+      setPreview(p);
       setApplyState('confirming');
     } catch (e) {
       setApplyError(e instanceof ApiError ? e.message : 'Não foi possível gerar a substituição.');
@@ -70,9 +58,7 @@ export default function TodayScreen({ useMock, report, loading, error, reload })
   async function handleConfirmApply() {
     setApplyState('applying');
     try {
-      if (!useMock) {
-        await applyToday();
-      }
+      await applyToday();
       setApplyState('applied');
     } catch (e) {
       setApplyError(e instanceof ApiError ? e.message : 'Falha ao aplicar em Intervals.icu.');
@@ -174,7 +160,7 @@ export default function TodayScreen({ useMock, report, loading, error, reload })
 
           {applyState === 'applied' && (
             <div className="sub" style={{ color: 'var(--green)' }}>
-              ✓ Treino alternativo criado em Intervals.icu{useMock ? ' (simulado - modo mock)' : ''}.
+              ✓ Treino alternativo criado em Intervals.icu.
             </div>
           )}
         </div>

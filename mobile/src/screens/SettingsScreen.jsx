@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSettings, saveSettings, healthCheck } from '../api/client';
 
-export default function SettingsScreen({ useMock, setUseMock }) {
+export default function SettingsScreen() {
   const [baseUrl, setBaseUrl] = useState('');
   const [token, setToken] = useState('');
   const [status, setStatus] = useState(null);
@@ -61,17 +61,6 @@ export default function SettingsScreen({ useMock, setUseMock }) {
             {testDetail && <div style={{ marginTop: 4, fontSize: 12, wordBreak: 'break-all' }}>{testDetail}</div>}
           </div>
         )}
-      </div>
-
-      <div className="card">
-        <div className="sub" style={{ marginBottom: 10 }}>MODO DE DESENVOLVIMENTO</div>
-        <div className="kv">
-          <span className="k">Usar dados mock (offline)</span>
-          <input type="checkbox" checked={useMock} onChange={(e) => setUseMock(e.target.checked)} />
-        </div>
-        <div className="sub" style={{ marginTop: 6 }}>
-          Enquanto o backend não tiver o "ingest" a ligar o GitHub Actions ao Render, usa mock para testar o ecrã.
-        </div>
       </div>
     </div>
   );
