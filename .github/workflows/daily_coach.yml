@@ -46,6 +46,8 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          RENDER_API_URL: ${{ secrets.RENDER_API_URL }}
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
         run: |
           EXTRA_ARGS="--auto"
 

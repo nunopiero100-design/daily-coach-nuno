@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Daily Coach</string>
+    <string name="title_activity_main">Daily Coach</string>
+    <string name="package_name">com.nuno.dailycoach</string>
+    <string name="custom_url_scheme">com.nuno.dailycoach</string>
+</resources>

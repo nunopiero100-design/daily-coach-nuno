@@ -5,14 +5,15 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.apply import ApplyError, apply_for_today, preview_apply_for_today
-from backend.auth import require_app_token
+from backend.auth import require_app_token, require_ingest_token
+from backend.schemas import DailyCoachReport
 from backend.feedback import (
     FeedbackEntry,
     list_feedback,
     load_feedback_for_date,
     save_feedback,
 )
-from backend.storage import DEFAULT_REPORTS_DIR, list_daily_reports, load_daily_report
+from backend.storage import DEFAULT_REPORTS_DIR, list_daily_reports, load_daily_report, save_daily_report
 
 
 app = FastAPI(
@@ -79,6 +80,21 @@ def run_daily_coach_now(
         "message": "Run-now endpoint reserved for future Daily Coach execution.",
         "next_step": "This will eventually trigger daily_coach_agent.py with rate limiting and safe execution.",
     }
+
+
+@app.post("/api/v1/reports/ingest")
+def ingest_report(
+    report: DailyCoachReport,
+    _: None = Depends(require_ingest_token),
+):
+    """
+    Called by daily_coach_agent.py (GitHub Actions) right after it builds
+    today's structured report - this is what makes GET /reports/today
+    actually have fresh data, instead of the two being disconnected islands.
+    Protected by INGEST_TOKEN, not APP_TOKEN - see auth.py for why.
+    """
+    saved_path = save_daily_report(report)
+    return {"status": "saved", "date": report.date.isoformat(), "path": str(saved_path)}
 
 
 @app.get("/api/v1/reports/today/apply/preview")

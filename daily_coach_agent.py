@@ -1988,6 +1988,31 @@ def build_replacement_event(original, target_date, status, decision_text, reason
 
 
 
+def push_structured_report_to_render(structured_report):
+    """
+    Best-effort push of today's structured report to the Render-hosted API,
+    so GET /api/v1/reports/today actually has fresh data. Never raises -
+    a failed push here should never break the rest of the run (the email/
+    local files/apply logic all already happened by the time this runs).
+    """
+    render_url = os.getenv("RENDER_API_URL", "").strip()
+    ingest_token = os.getenv("INGEST_TOKEN", "").strip()
+    if not render_url or not ingest_token:
+        return False, "RENDER_API_URL/INGEST_TOKEN não configurados; relatório não enviado ao backend."
+    try:
+        r = requests.post(
+            f"{render_url.rstrip('/')}/api/v1/reports/ingest",
+            headers={"Authorization": f"Bearer {ingest_token}", "Content-Type": "application/json"},
+            data=structured_report.model_dump_json(),
+            timeout=30,
+        )
+        if not r.ok:
+            return False, f"Envio para Render falhou: HTTP {r.status_code} {r.text[:300]}"
+        return True, "Relatório enviado para o backend (Render) com sucesso."
+    except Exception as e:
+        return False, f"Erro ao enviar relatório para Render: {e}"
+
+
 def smtp_configured():
     required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "TO_EMAIL"]
     return all(os.getenv(k, "").strip() for k in required)
@@ -2378,6 +2403,23 @@ def main():
         "applied": applied,
         "apply_error": apply_error,
     }, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+
+    try:
+        from backend.structured_report_builder import build_structured_daily_report
+        structured = build_structured_daily_report(
+            target=target,
+            context=context,
+            decision=decision,
+            report_text=report,
+            auto_apply=allow_apply,
+        )
+        Path("daily_coach_structured_report.json").write_text(
+            structured.model_dump_json(indent=2), encoding="utf-8"
+        )
+        push_ok, push_msg = push_structured_report_to_render(structured)
+        print(push_msg)
+    except Exception as e:
+        print(f"Aviso: falha ao construir/enviar o relatório estruturado: {e}")
 
     if args.debug:
         Path("debug_raw_agent.json").write_text(json.dumps({

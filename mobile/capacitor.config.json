@@ -1,0 +1,8 @@
+{
+  "appId": "com.nuno.dailycoach",
+  "appName": "Daily Coach",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}

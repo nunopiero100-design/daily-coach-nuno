@@ -1,0 +1,70 @@
+{
+  "date": "2026-08-20",
+  "generated_at": "2026-08-20T07:10:00",
+  "status": "YELLOW",
+  "title": "Faz o threshold em versão reduzida e controlada",
+  "summary": "Ontem foi mais duro que o planeado; hoje protege a recuperação.",
+  "full_text": "",
+  "source_plan": "FasCat",
+  "auto_apply": false,
+  "planned_workout": {
+    "name": "W10_3 Thu - Long Threshold 2x18",
+    "description": null,
+    "duration_minutes": 90,
+    "planned_tss": 104,
+    "source": "FasCat"
+  },
+  "completed_activity": {
+    "exists": false,
+    "name": null,
+    "duration_minutes": null,
+    "tss": null,
+    "avg_power": null,
+    "normalized_power": null,
+    "intensity_factor": null
+  },
+  "readiness": {
+    "sleep_available": true,
+    "hrv_available": true,
+    "resting_hr_available": true,
+    "sleep_hours": 8.62,
+    "hrv": 51.0,
+    "resting_hr": 46,
+    "fitness_ctl": 73,
+    "fatigue_atl": 87,
+    "form": -14,
+    "notes": null
+  },
+  "weight": {
+    "current_kg": 75.5,
+    "avg_7d_kg": 75.9,
+    "target_kg": 74.0,
+    "weekly_trend_kg": null,
+    "guidance": null
+  },
+  "fueling": {
+    "protein_target_g": "150-170 g/dia",
+    "carb_guidance": "60-80 g hidratos/h se a sessão passar de ~75 min.",
+    "deficit_guidance": "Hoje há qualidade/intensidade: não fazer défice agressivo.",
+    "notes": null
+  },
+  "recommendation": {
+    "action": "REDUCE",
+    "headline": "Faz o threshold em versão reduzida e controlada",
+    "details": "Ontem foi mais duro que o planeado: 123 vs 66 TSS e 2h26 vs 1h30.\nFazer o treino planeado com potência 2-5% abaixo do alvo.\nSe o RPE subir cedo, cortar para 1x18 e terminar em Z2 fácil.",
+    "workout_modification": "Fazer o treino planeado com potência 2-5% abaixo do alvo.\nSe o RPE subir cedo, cortar para 1x18 e terminar em Z2 fácil.",
+    "indoor_alternative": null
+  },
+  "flags": {
+    "incomplete_essential_data": false,
+    "already_trained_today": false,
+    "missed_yesterday_workout": false,
+    "weekend_indoor_option_available": false,
+    "no_bike_week": false,
+    "sick": false,
+    "injured": false,
+    "race_week": false,
+    "rain_or_indoor_constraint": false,
+    "no_time_constraint": false
+  }
+}
