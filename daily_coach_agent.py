@@ -129,7 +129,8 @@ def weight_kg(w):
         return v / 1000
     return v
 
-    def athlete_ftp(athlete):
+
+def athlete_ftp(athlete):
     """
     Best-effort FTP extraction from the /athlete/{id} profile response.
     Intervals.icu exposes FTP either at the top level (older/simple responses)
@@ -160,6 +161,7 @@ def weight_kg(w):
         if best is not None:
             return best
     return None
+
 
 def ctl(w):
     return fnum(first(w, ["ctl", "fitness", "icu_ctl", "icu_fitness"]))
@@ -948,7 +950,7 @@ def call_openai(openai_key, model, reasoning_effort, context):
     2) se vier sem texto, tenta Chat Completions como fallback
     3) não exige JSON do modelo; usa formato linha-a-linha fácil de parsear
     """
-        if not openai_key:
+    if not openai_key:
         return None, "OPENAI_API_KEY ausente; usei regras heurísticas."
 
     tm = context.get("today_metrics", {}) or {}
@@ -2057,7 +2059,7 @@ def main():
     end = target + dt.timedelta(days=1)
 
     client = IntervalsClient(athlete_id, intervals_key)
-        athlete = client.athlete()
+    athlete = client.athlete()
     if athlete_id == "0" and athlete.get("id"):
         client.athlete_id = athlete["id"]
     athlete_ftp_value = athlete_ftp(athlete)
@@ -2118,7 +2120,7 @@ def main():
 
     context = {
         "date": target.isoformat(),
-                "athlete": {"id": athlete.get("id"), "name": athlete.get("name"), "ftp": athlete_ftp_value},
+        "athlete": {"id": athlete.get("id"), "name": athlete.get("name"), "ftp": athlete_ftp_value},
         "today_metrics": {
             "sleep_hours": sleep_h(today_w),
             "sleep_score": sleep_score(today_w),
