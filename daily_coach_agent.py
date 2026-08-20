@@ -129,6 +129,37 @@ def weight_kg(w):
         return v / 1000
     return v
 
+    def athlete_ftp(athlete):
+    """
+    Best-effort FTP extraction from the /athlete/{id} profile response.
+    Intervals.icu exposes FTP either at the top level (older/simple responses)
+    or per-sport inside sportSettings. We prefer a top-level value, then fall
+    back to the first sportSettings entry that has a usable ftp, preferring
+    one whose types list includes Ride/VirtualRide (or has no restriction,
+    i.e. the default sport setting).
+    """
+    if not isinstance(athlete, dict):
+        return None
+    v = fnum(first(athlete, ["ftp", "icu_ftp", "eftp", "icu_eftp"]))
+    if v:
+        return v
+    settings = athlete.get("sportSettings") or athlete.get("sport_settings")
+    if isinstance(settings, list):
+        best = None
+        for s in settings:
+            if not isinstance(s, dict):
+                continue
+            s_ftp = fnum(first(s, ["ftp", "icu_ftp"]))
+            if not s_ftp:
+                continue
+            types = s.get("types") or []
+            if not types or "Ride" in types or "VirtualRide" in types:
+                return s_ftp
+            if best is None:
+                best = s_ftp
+        if best is not None:
+            return best
+    return None
 
 def ctl(w):
     return fnum(first(w, ["ctl", "fitness", "icu_ctl", "icu_fitness"]))
@@ -917,16 +948,32 @@ def call_openai(openai_key, model, reasoning_effort, context):
     2) se vier sem texto, tenta Chat Completions como fallback
     3) não exige JSON do modelo; usa formato linha-a-linha fácil de parsear
     """
-    if not openai_key:
+        if not openai_key:
         return None, "OPENAI_API_KEY ausente; usei regras heurísticas."
 
-    instructions = """
+    tm = context.get("today_metrics", {}) or {}
+    bl = context.get("baseline_14d", {}) or {}
+    weight_now = tm.get("weight_kg") if tm.get("weight_kg") is not None else bl.get("weight_7d")
+    weight_display = (
+        f"{weight_now:.1f} kg (Intervals, hoje/média 7d)"
+        if weight_now is not None
+        else "peso não disponível hoje; usar o valor mais recente conhecido em Intervals"
+    )
+
+    ftp_now = (context.get("athlete") or {}).get("ftp")
+    ftp_display = (
+        f"{ftp_now:.0f} W (perfil Intervals)"
+        if ftp_now
+        else "FTP não disponível no perfil; usar o valor mais recente configurado em Intervals"
+    )
+
+    instructions = f"""
 És um treinador profissional de ciclismo de estrada do Nuno.
 
 Perfil do atleta:
 - Homem, 38/39 anos
-- 77 kg
-- FTP 319-320 W
+- Peso atual: {weight_display}
+- FTP atual: {ftp_display}
 - Perfil fisiológico diesel: forte em potência sustentada, tempo, sweet spot e threshold
 - Objetivo principal: melhorar FTP e potência sustentada sem comprometer recuperação
 - O plano atual tem segunda e sexta como descanso, terça e quinta como dias de qualidade, quarta Z2 real, sábado estruturado até 2h e domingo social/livre
@@ -2010,9 +2057,10 @@ def main():
     end = target + dt.timedelta(days=1)
 
     client = IntervalsClient(athlete_id, intervals_key)
-    athlete = client.athlete()
+        athlete = client.athlete()
     if athlete_id == "0" and athlete.get("id"):
         client.athlete_id = athlete["id"]
+    athlete_ftp_value = athlete_ftp(athlete)
 
     wellness = client.wellness_range(start, end)
     activities = client.activities_range(start, end)
@@ -2070,7 +2118,7 @@ def main():
 
     context = {
         "date": target.isoformat(),
-        "athlete": {"id": athlete.get("id"), "name": athlete.get("name")},
+                "athlete": {"id": athlete.get("id"), "name": athlete.get("name"), "ftp": athlete_ftp_value},
         "today_metrics": {
             "sleep_hours": sleep_h(today_w),
             "sleep_score": sleep_score(today_w),
