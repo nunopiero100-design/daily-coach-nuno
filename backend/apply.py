@@ -1,18 +1,20 @@
 """
-Apply-to-Intervals logic for the "Apply reduced workout" app button.
+Apply-to-Intervals logic for the "Create alternative workout" app button.
 
-Reuses the existing replacement-building logic from daily_coach_agent.py
-instead of duplicating it - build_replacement_event(), choose_replacement_kind(),
-replacement_steps() and IntervalsClient all already exist and are proven; this
-module just wires them up to the API.
+Reuses the existing helper functions from daily_coach_agent.py rather than
+duplicating them - choose_replacement_kind(), replacement_steps(), the ZWO
+builder, and IntervalsClient all already exist and are proven.
 
-Design choice: today's ORIGINAL planned event is re-fetched live from
-Intervals.icu rather than trusted from the stored structured report, because
-PlannedWorkout (schemas.py) doesn't carry external_id / start_date_local / type
-- and build_replacement_event() refuses to run without a real external_id
-(to avoid creating a duplicate event instead of replacing the right one).
-Re-fetching fresh also guarantees we're never modifying a stale morning
-snapshot.
+Design choice: this creates a brand-new, STANDALONE calendar event via
+build_alternate_event(), rather than trying to edit/replace the original
+in place. The original workout is never touched or deleted - Nuno deletes
+it himself in Intervals when he's ready. This sidesteps needing a reliable
+external_id on today's event (which isn't always present, e.g. for events
+added or hand-edited directly in Intervals rather than synced from a plan).
+
+Today's original event is still re-fetched live from Intervals.icu (rather
+than trusted from the stored structured report) purely to get its real
+start time/type/name as a sensible template for the new event.
 """
 import os
 import datetime as dt
@@ -83,7 +85,7 @@ def _build_replacement(target_date: dt.date):
     reasons, actions = _reasons_and_actions_from_recommendation(recommendation)
     decision_text = recommendation.get("headline") or report.get("title") or ""
 
-    replacement, err = dca.build_replacement_event(
+    replacement, err = dca.build_alternate_event(
         original=original,
         target_date=target_date,
         status=status_pt,

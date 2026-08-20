@@ -1987,6 +1987,75 @@ def build_replacement_event(original, target_date, status, decision_text, reason
     return ev, None
 
 
+def build_alternate_event(original, target_date, status, decision_text, reasons, actions):
+    """
+    Creates a brand-new, standalone calendar event instead of trying to
+    replace the original in place. This deliberately never sets
+    external_id, so Intervals.icu always creates a fresh event rather than
+    matching/upserting against the original - which means, unlike
+    build_replacement_event() above, this doesn't need (or check for) the
+    original's external_id at all.
+
+    Nuno's own preference: end up with two workouts on the day and delete
+    the one he doesn't want himself in Intervals, rather than have the
+    automation try to edit/replace the original - which isn't always
+    reliable, e.g. for events added or hand-edited directly in Intervals
+    rather than synced in from a plan, which often lack an external_id.
+    """
+    original_name = original.get("name") or "treino planeado"
+
+    kind = choose_replacement_kind(status, original_name)
+    steps = replacement_steps(kind)
+    duration = dur_min(steps)
+    new_load = est_load_steps(steps)
+
+    if status == "VERMELHO":
+        new_name = f"ALTERNATIVA — Recovery/Z2 60min (em vez de: {original_name})"
+    else:
+        new_name = f"ALTERNATIVA — versão reduzida (em vez de: {original_name})"
+
+    zwo_text = zwo_from_steps(new_name, steps)
+    filename = safe_filename(new_name)
+    zwo_b64 = base64.b64encode(zwo_text.encode("utf-8")).decode("ascii")
+
+    start_raw = original.get("start_date_local") or f"{target_date.isoformat()}T11:30:00"
+    start_dt = parse_datetime_local(start_raw, target_date)
+    end_dt = start_dt + dt.timedelta(minutes=duration)
+
+    desc = []
+    desc.append("Criado pelo Daily Coach Agent como ALTERNATIVA ao treino original.")
+    desc.append("O treino original NÃO foi tocado - apaga-o manualmente quando quiseres.")
+    desc.append(f"Estado: {status}")
+    desc.append("")
+    desc.append("Treino original:")
+    desc.append(original_name)
+    desc.append("")
+    desc.append("Decisão:")
+    desc.append(decision_text or "")
+    desc.append("")
+    desc.append("Motivos:")
+    desc += [f"- {r}" for r in reasons]
+    desc.append("")
+    desc.append("Ações:")
+    desc += [f"- {a}" for a in actions]
+
+    ev = {
+        "category": "WORKOUT",
+        "type": original.get("type") or "Ride",
+        "start_date_local": start_dt.isoformat(timespec="seconds"),
+        "end_date_local": end_dt.isoformat(timespec="seconds"),
+        "name": new_name,
+        "description": "\n".join(desc),
+        "moving_time": duration * 60,
+        "load": new_load,
+        "icu_training_load": new_load,
+        "filename": filename,
+        "file_contents_base64": zwo_b64,
+        # deliberately no "external_id" key here - see docstring above.
+    }
+    return ev, None
+
+
 
 def push_structured_report_to_render(structured_report):
     """

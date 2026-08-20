@@ -169,12 +169,12 @@ export default function TodayScreen({ useMock }) {
 
       {canApply && (
         <div className="card">
-          <div className="sub" style={{ marginBottom: 10 }}>MUDAR O TREINO EM INTERVALS.ICU</div>
+          <div className="sub" style={{ marginBottom: 10 }}>CRIAR ALTERNATIVA EM INTERVALS.ICU</div>
 
           {applyState === 'idle' && (
             <>
               {applyError && <div className="sub" style={{ color: 'var(--red)', marginBottom: 8 }}>{applyError}</div>}
-              <button className="primary-btn" onClick={handleStartApply}>Ver versão reduzida</button>
+              <button className="primary-btn" onClick={handleStartApply}>Ver alternativa</button>
             </>
           )}
 
@@ -182,11 +182,12 @@ export default function TodayScreen({ useMock }) {
 
           {applyState === 'confirming' && preview && (
             <>
-              <div className="kv"><span className="k">De</span><span className="v" style={{ textAlign: 'right' }}>{preview.original_name}</span></div>
-              <div className="kv"><span className="k">Para</span><span className="v" style={{ textAlign: 'right' }}>{preview.new_name}</span></div>
-              <div className="kv"><span className="k">Nova carga</span><span className="v">{preview.new_load} TSS</span></div>
+              <div className="kv"><span className="k">Original (fica)</span><span className="v" style={{ textAlign: 'right' }}>{preview.original_name}</span></div>
+              <div className="kv"><span className="k">Nova alternativa</span><span className="v" style={{ textAlign: 'right' }}>{preview.new_name}</span></div>
+              <div className="kv"><span className="k">Carga da alternativa</span><span className="v">{preview.new_load} TSS</span></div>
+              <div className="sub" style={{ marginTop: 8 }}>Vais ficar com os dois treinos hoje - apaga o que não quiseres diretamente no Intervals.icu.</div>
               <div style={{ height: 10 }} />
-              <button className="primary-btn" onClick={handleConfirmApply}>Confirmar em Intervals.icu</button>
+              <button className="primary-btn" onClick={handleConfirmApply}>Criar em Intervals.icu</button>
               <div style={{ height: 8 }} />
               <button className="icon-btn" style={{ width: '100%' }} onClick={() => setApplyState('idle')}>Cancelar</button>
             </>
@@ -196,7 +197,7 @@ export default function TodayScreen({ useMock }) {
 
           {applyState === 'applied' && (
             <div className="sub" style={{ color: 'var(--green)' }}>
-              ✓ Treino substituído em Intervals.icu{useMock ? ' (simulado - modo mock)' : ''}.
+              ✓ Treino alternativo criado em Intervals.icu{useMock ? ' (simulado - modo mock)' : ''}.
             </div>
           )}
         </div>
