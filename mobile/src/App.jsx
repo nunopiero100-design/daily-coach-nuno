@@ -97,7 +97,7 @@ export default function App() {
         )}
         {tab === 'gym' && <GymScreen report={report} />}
         {tab === 'history' && <HistoryScreen />}
-        {tab === 'nutrition' && <NutritionScreen report={report} />}
+        {tab === 'nutrition' && <NutritionScreen report={report} loading={reportLoading} />}
         {tab === 'settings' && <SettingsScreen />}
       </div>
 

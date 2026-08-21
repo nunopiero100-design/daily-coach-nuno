@@ -3,6 +3,7 @@ import { sendFeedback, getApplyPreview, applyToday, ApiError } from '../api/clie
 import StatusRing from '../components/StatusRing';
 import StatTile from '../components/StatTile';
 import { statusColor, hexToRgba } from '../statusColors';
+import { fmtMin, fmtNum } from '../format';
 import {
   IconMoon, IconHeart, IconActivity, IconTrendingUp, IconScale,
   IconArrowRight, IconUtensils, IconClock, IconCloudRain, IconVirus,
@@ -19,18 +20,6 @@ const FEEDBACK_OPTIONS = [
 
 // The backend only allows applying a replacement on YELLOW/RED days.
 const APPLICABLE_STATUSES = ['YELLOW', 'RED'];
-
-function fmtMin(m) {
-  if (m == null) return 'n/d';
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  return h > 0 ? `${h}h${mm ? mm + 'm' : ''}` : `${mm}m`;
-}
-
-function fmtNum(v, digits = 0) {
-  if (v == null || Number.isNaN(v)) return 'n/d';
-  return Number(v).toFixed(digits);
-}
 
 // The coach always outputs a normal plan + conditional fallbacks (60min/45min/
 // indoor) + fueling, every day - even when the alternates aren't relevant.
@@ -124,6 +113,7 @@ export default function TodayScreen({ report, loading, error, reload }) {
   if (!report) return <div className="center-msg">Sem relatório para hoje.</div>;
 
   const pw = report.planned_workout;
+  const ca = report.completed_activity;
   const rd = report.readiness || {};
   const w = report.weight || {};
   const rec = report.recommendation || {};
@@ -159,6 +149,36 @@ export default function TodayScreen({ report, loading, error, reload }) {
         </div>
       ) : (
         <div className="card"><div className="sub">Sem treino planeado hoje.</div></div>
+      )}
+
+      {ca?.exists && (
+        <div className="card">
+          <div className="sub" style={{ marginBottom: 8 }}>JÁ REALIZADO HOJE</div>
+          <div className="kv"><span className="k">Sessão</span><span className="v">{ca.name || 'n/d'}</span></div>
+          <div className="kv"><span className="k">Duração</span><span className="v">{fmtMin(ca.duration_minutes)}</span></div>
+          <div className="kv">
+            <span className="k">TSS</span>
+            <span className="v">
+              {ca.tss ?? 'n/d'}
+              {ca.tss != null && pw?.planned_tss != null && (
+                <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6, fontSize: 12 }}>
+                  ({ca.tss - pw.planned_tss >= 0 ? '+' : ''}{Math.round(ca.tss - pw.planned_tss)} vs planeado)
+                </span>
+              )}
+            </span>
+          </div>
+          {ca.avg_power != null && (
+            <div className="kv"><span className="k">Potência média</span><span className="v">{Math.round(ca.avg_power)} W</span></div>
+          )}
+          {ca.normalized_power != null && (
+            <div className="kv"><span className="k">Normalized Power</span><span className="v">{Math.round(ca.normalized_power)} W</span></div>
+          )}
+          {ca.intensity_factor != null && (
+            <div className="kv" style={{ borderBottom: 'none' }}>
+              <span className="k">Intensity Factor</span><span className="v">{fmtNum(ca.intensity_factor, 2)}</span>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="section-label">Readiness &amp; peso</div>

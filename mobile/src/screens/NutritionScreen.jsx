@@ -1,18 +1,12 @@
 import { useState } from 'react';
 import nutritionData from '../mock/nutritionPlan.json';
 import { fuelingTarget, resolveDayType, supplementsToday } from '../fueling';
+import { fmtMin } from '../format';
 import { IconUtensils, IconClock } from '../components/Icons';
 
 // Ported from Nuno_RidePlan_App_3.html - real meal options, macros and
 // supplement timing, not placeholder content.
 const DIET_ORDER = ['REST', 'ENDURANCE', 'HARD', 'BIG', 'TRAVEL'];
-
-function fmtMin(m) {
-  if (m == null) return 'n/d';
-  const h = Math.floor(m / 60);
-  const mm = m % 60;
-  return h > 0 ? `${h}h${mm ? mm + 'm' : ''}` : `${mm}m`;
-}
 
 function MealSlot({ meal }) {
   return (
@@ -52,11 +46,14 @@ function DietTypeCard({ dietType, highlighted }) {
   );
 }
 
-export default function NutritionScreen({ report }) {
+export default function NutritionScreen({ report, loading }) {
   const [showAll, setShowAll] = useState(false);
   const pw = report?.planned_workout;
   const target = fuelingTarget(pw);
 
+  // While the shared report fetch is still in flight, `report` is null - that
+  // used to render the same "sem treino planeado" text as a real no-workout
+  // day, which is misleading. Show a loading placeholder instead.
   const todayEntry = report ? resolveDayType(report, nutritionData) : null;
   const todayKey = todayEntry?.diet;
   const todayType = todayKey ? nutritionData.dietTypes[todayKey] : null;
@@ -70,13 +67,14 @@ export default function NutritionScreen({ report }) {
       </div>
 
       <div className="card">
-        {!pw?.name && (
+        {loading && <div className="skeleton" style={{ height: 70 }} />}
+        {!loading && !pw?.name && (
           <div className="sub">Sem treino planeado hoje — sem necessidade de fueling específico na bike.</div>
         )}
-        {pw?.name && !target && (
+        {!loading && pw?.name && !target && (
           <div className="sub">Duração do treino não disponível para calcular um alvo de carboidratos.</div>
         )}
-        {pw?.name && target && (
+        {!loading && pw?.name && target && (
           <>
             <div className="kv"><span className="k">Sessão</span><span className="v">{pw.name}</span></div>
             <div className="kv"><span className="k">Duração</span><span className="v">{fmtMin(pw.duration_minutes)}</span></div>
@@ -114,7 +112,8 @@ export default function NutritionScreen({ report }) {
         <IconClock size={13} />PLANO POR TIPO DE DIA
       </div>
 
-      {todayType && <DietTypeCard dietType={todayType} highlighted />}
+      {loading && <div className="skeleton" style={{ height: 120, marginBottom: 14 }} />}
+      {!loading && todayType && <DietTypeCard dietType={todayType} highlighted />}
 
       {!showAll ? (
         <button className="icon-btn" style={{ width: '100%' }} onClick={() => setShowAll(true)}>
