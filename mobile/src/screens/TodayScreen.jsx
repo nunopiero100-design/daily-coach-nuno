@@ -25,6 +25,27 @@ function fmtNum(v, digits = 0) {
   return Number(v).toFixed(digits);
 }
 
+// The coach always outputs a normal plan + conditional fallbacks (60min/45min/
+// indoor) + fueling, every day - even when the alternates aren't relevant.
+// Group them so the normal plan reads prominently and the "se..." alternates
+// are tucked away instead of forcing a wall of text every morning.
+function groupActions(raw) {
+  const lines = (raw || '')
+    .split('\n')
+    .map((l) => l.replace(/^-\s*/, '').trim())
+    .filter(Boolean);
+  const primary = [];
+  const alternatives = [];
+  const fueling = [];
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (lower.startsWith('se ')) alternatives.push(line);
+    else if (lower.startsWith('recupera') || lower.startsWith('fueling')) fueling.push(line);
+    else primary.push(line);
+  }
+  return { primary, alternatives, fueling };
+}
+
 export default function TodayScreen({ report, loading, error, reload }) {
   const [sentFeedback, setSentFeedback] = useState(null);
 
@@ -86,6 +107,14 @@ export default function TodayScreen({ report, loading, error, reload }) {
   const w = report.weight || {};
   const rec = report.recommendation || {};
   const canApply = APPLICABLE_STATUSES.includes(report.status) && pw?.name;
+  const grouped = groupActions(rec.workout_modification || rec.details);
+  const actionLineSet = new Set(
+    [...grouped.primary, ...grouped.alternatives, ...grouped.fueling]
+  );
+  const reasonsOnly = (rec.details || '')
+    .split('\n')
+    .map((l) => l.replace(/^-\s*/, '').trim())
+    .filter((l) => l && !actionLineSet.has(l));
 
   return (
     <div>
@@ -125,9 +154,27 @@ export default function TodayScreen({ report, loading, error, reload }) {
       <div className="card lead">
         <div className="sub" style={{ marginBottom: 8 }}>DECISÃO — {rec.action || 'n/d'}</div>
         <div className="sub" style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>{rec.headline}</div>
-        {(rec.workout_modification || rec.details || '').split('\n').filter(Boolean).map((line, i) => (
-          <div className="action-line" key={i} style={{ marginBottom: 6 }}>{line}</div>
+
+        {grouped.primary.map((line, i) => (
+          <div className="action-line" key={`p${i}`} style={{ marginBottom: 6, fontSize: 15 }}>{line}</div>
         ))}
+
+        {grouped.fueling.map((line, i) => (
+          <div className="action-line" key={`f${i}`} style={{ marginBottom: 6, marginTop: 8, color: 'var(--text-dim)' }}>{line}</div>
+        ))}
+
+        {grouped.alternatives.length > 0 && (
+          <details style={{ marginTop: 10 }}>
+            <summary style={{ cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13 }}>
+              Alternativas (menos tempo / indoor) <span className="chev">›</span>
+            </summary>
+            <div style={{ marginTop: 8 }}>
+              {grouped.alternatives.map((line, i) => (
+                <div className="action-line" key={`a${i}`} style={{ marginBottom: 6, fontSize: 13, color: 'var(--text-dim)' }}>{line}</div>
+              ))}
+            </div>
+          </details>
+        )}
       </div>
 
       {canApply && (
@@ -166,10 +213,10 @@ export default function TodayScreen({ report, loading, error, reload }) {
         </div>
       )}
 
-      {(rec.details || '').length > 0 && (
+      {reasonsOnly.length > 0 && (
         <div className="card">
-          <div className="sub" style={{ marginBottom: 8 }}>MOTIVOS + AÇÕES</div>
-          {rec.details.split('\n').filter(Boolean).map((line, i) => (
+          <div className="sub" style={{ marginBottom: 8 }}>MOTIVOS</div>
+          {reasonsOnly.map((line, i) => (
             <div key={i} className="action-line" style={{ marginBottom: 6 }}>{line}</div>
           ))}
         </div>
