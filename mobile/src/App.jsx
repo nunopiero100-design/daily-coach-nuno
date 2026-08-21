@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import TodayScreen from './screens/TodayScreen';
 import GymScreen from './screens/GymScreen';
 import HistoryScreen from './screens/HistoryScreen';
+import NutritionScreen from './screens/NutritionScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { getTodayReport, runNow, ApiError } from './api/client';
 import { initPushNotifications } from './api/push';
-import { IconRefresh, IconHome, IconDumbbell, IconClock, IconSettingsGear } from './components/Icons';
+import { IconRefresh, IconHome, IconDumbbell, IconClock, IconSettingsGear, IconUtensils } from './components/Icons';
 
 export default function App() {
   const [tab, setTab] = useState('today');
@@ -96,6 +97,7 @@ export default function App() {
         )}
         {tab === 'gym' && <GymScreen report={report} />}
         {tab === 'history' && <HistoryScreen />}
+        {tab === 'nutrition' && <NutritionScreen report={report} />}
         {tab === 'settings' && <SettingsScreen />}
       </div>
 
@@ -108,6 +110,9 @@ export default function App() {
         </div>
         <div className={`tab ${tab === 'history' ? 'on' : ''}`} onClick={() => setTab('history')}>
           <IconClock size={19} />Histórico
+        </div>
+        <div className={`tab ${tab === 'nutrition' ? 'on' : ''}`} onClick={() => setTab('nutrition')}>
+          <IconUtensils size={19} />Nutrição
         </div>
         <div className={`tab ${tab === 'settings' ? 'on' : ''}`} onClick={() => setTab('settings')}>
           <IconSettingsGear size={19} />Settings

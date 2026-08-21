@@ -1,0 +1,25 @@
+{
+  "dayTypes": [
+    {
+      "key": "LONG",
+      "label": "Dia de treino longo",
+      "description": "Treinos de endurance mais longos (>2h planeadas).",
+      "meals": [],
+      "notes": ""
+    },
+    {
+      "key": "SHORT_HARD",
+      "label": "Dia de treino curto / intenso",
+      "description": "Sessões mais curtas ou com intervalos/qualidade.",
+      "meals": [],
+      "notes": ""
+    },
+    {
+      "key": "REST",
+      "label": "Dia de descanso",
+      "description": "Sem treino planeado, ou dia de recovery total.",
+      "meals": [],
+      "notes": ""
+    }
+  ]
+}
