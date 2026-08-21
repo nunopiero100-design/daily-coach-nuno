@@ -1,25 +1,1113 @@
 {
-  "dayTypes": [
+  "planWindow": {
+    "start": "2026-06-15",
+    "end": "2026-09-20"
+  },
+  "calendar": [
     {
-      "key": "LONG",
-      "label": "Dia de treino longo",
-      "description": "Treinos de endurance mais longos (>2h planeadas).",
-      "meals": [],
-      "notes": ""
+      "date": "2026-06-15",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
     },
     {
-      "key": "SHORT_HARD",
-      "label": "Dia de treino curto / intenso",
-      "description": "Sessões mais curtas ou com intervalos/qualidade.",
-      "meals": [],
-      "notes": ""
+      "date": "2026-06-16",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
     },
     {
-      "key": "REST",
-      "label": "Dia de descanso",
-      "description": "Sem treino planeado, ou dia de recovery total.",
-      "meals": [],
-      "notes": ""
+      "date": "2026-06-17",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-06-18",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-06-19",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-06-20",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-06-21",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-06-22",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-06-23",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-06-24",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-06-25",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-06-26",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-06-27",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-06-28",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-06-29",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-06-30",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-01",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-07-02",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-03",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-07-04",
+      "type": "sat",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-05",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-06",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-07-07",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-08",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-07-09",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-10",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-07-11",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-12",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-13",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-07-14",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-15",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-07-16",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-17",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-07-18",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-19",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-20",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-21",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-22",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-23",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-24",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-25",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-26",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-07-27",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-07-28",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-29",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-07-30",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-07-31",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-08-01",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-02",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-03",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-08-04",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-05",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-08-06",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-07",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-08-08",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-09",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-10",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-08-11",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-12",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-08-13",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-14",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-08-15",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-16",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-17",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-08-18",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-19",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-08-20",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-21",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-08-22",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-23",
+      "type": "sun",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-24",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-08-25",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-26",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-08-27",
+      "type": "indoor",
+      "diet": "HARD",
+      "hard": true,
+      "gym": null
+    },
+    {
+      "date": "2026-08-28",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-08-29",
+      "type": "sat",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-30",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-08-31",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-01",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-02",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-03",
+      "type": "away",
+      "diet": "TRAVEL",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-04",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-09-05",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-06",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-07",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-09-08",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-09",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-09-10",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-11",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-09-12",
+      "type": "sat",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-13",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-14",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Push"
+    },
+    {
+      "date": "2026-09-15",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-16",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": "Pull"
+    },
+    {
+      "date": "2026-09-17",
+      "type": "indoor",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-18",
+      "type": "rest",
+      "diet": "REST",
+      "hard": false,
+      "gym": "Legs"
+    },
+    {
+      "date": "2026-09-19",
+      "type": "sat",
+      "diet": "BIG",
+      "hard": false,
+      "gym": null
+    },
+    {
+      "date": "2026-09-20",
+      "type": "sun",
+      "diet": "ENDURANCE",
+      "hard": false,
+      "gym": null
     }
+  ],
+  "dietTypes": {
+    "REST": {
+      "label": "Rest / Gym day (Mon, Fri)",
+      "target": "~1980 kcal, carbs 190g, protein 181g, fat 62g",
+      "when": "Off the bike (gym Mon/Fri). Lower carbs, protein high to stay full and protect muscle.",
+      "onbike": null,
+      "hdr": "#6b7685",
+      "meals": [
+        {
+          "meal": "Breakfast",
+          "opts": [
+            {
+              "desc": "Ovos (3), Pão integral (2 fatias), M. amendoim (10g), Laranja (1), Café",
+              "macro": "~492 kcal, C46, P29"
+            },
+            {
+              "desc": "Skyr (200g), Aveia (40g), Frutos vermelhos (80g), Amêndoas (10g), Mel (5g)",
+              "macro": "~397 kcal, C50, P30"
+            },
+            {
+              "desc": "Ovos (2), Iogurte grego (150g), Pão integral (1 fatia), Maçã (1)",
+              "macro": "~384 kcal, C39, P31"
+            }
+          ]
+        },
+        {
+          "meal": "Mid-morning snack",
+          "opts": [
+            {
+              "desc": "Iogurte grego (170g), Frutos vermelhos (80g), Amêndoas (15g)",
+              "macro": "~230 kcal, C19, P21"
+            },
+            {
+              "desc": "Maçã (1), Amêndoas (15g), Iogurte proteico (150g)",
+              "macro": "~254 kcal, C30, P19"
+            },
+            {
+              "desc": "Requeijão magro (150g), Maçã (1)",
+              "macro": "~225 kcal, C26, P17"
+            }
+          ]
+        },
+        {
+          "meal": "Lunch",
+          "opts": [
+            {
+              "desc": "Peito de frango (180g), Brócolos (200g), Batata-doce (150g), Azeite (10g)",
+              "macro": "~507 kcal, C46, P50"
+            },
+            {
+              "desc": "Atum (1,5 lata, 180g), Grão coz. (150g), Tomate (100g), Azeite (10g)",
+              "macro": "~561 kcal, C44, P61"
+            },
+            {
+              "desc": "Salmão (150g), Brócolos/espinafres (200g), Arroz cozido (140g), Azeite (5g)",
+              "macro": "~610 kcal, C55, P39"
+            }
+          ]
+        },
+        {
+          "meal": "Afternoon snack",
+          "opts": [
+            {
+              "desc": "Whey (30g), Leite (200ml), Maçã (1)",
+              "macro": "~286 kcal, C33, P31"
+            },
+            {
+              "desc": "Skyr (170g), Frutos vermelhos (80g), Amêndoas (10g)",
+              "macro": "~207 kcal, C19, P22"
+            },
+            {
+              "desc": "Atum (1 lata, 120g), Tortitas de milho (2), Tomate (100g)",
+              "macro": "~226 kcal, C18, P34"
+            }
+          ]
+        },
+        {
+          "meal": "Dinner",
+          "opts": [
+            {
+              "desc": "Peito de frango (180g), Brócolos (200g), Batata-doce (150g), Azeite (5g)",
+              "macro": "~463 kcal, C46, P50"
+            },
+            {
+              "desc": "Salmão (150g), Lentilhas coz. (120g), Espinafres (150g), Azeite (5g)",
+              "macro": "~530 kcal, C29, P45"
+            },
+            {
+              "desc": "Ovos (3), Brócolos/legumes (200g), Pão integral (1 fatia), Tomate (100g), Azeite (5g)",
+              "macro": "~419 kcal, C31, P29"
+            }
+          ]
+        }
+      ]
+    },
+    "ENDURANCE": {
+      "label": "Endurance day (easy ride)",
+      "target": "~2230 kcal, carbs 265g, protein 173g, fat 56g",
+      "when": "Easy ride (Wed turbo / easy Saturday). Moderate carbs around the ride, same protein.",
+      "onbike": "Optional on an easy spin: water + electrolytes, a banana if it runs long. No need to load.",
+      "hdr": "#49c5f0",
+      "meals": [
+        {
+          "meal": "Breakfast",
+          "opts": [
+            {
+              "desc": "Aveia (50g), Leite (250ml), Whey (25g), Frutos vermelhos (60g), Banana (1/2), Mel (5g)",
+              "macro": "~506 kcal, C72, P36"
+            },
+            {
+              "desc": "Corn Flakes (50g), Skyr (170g), Banana (1), Mel (5g)",
+              "macro": "~382 kcal, C71, P23"
+            },
+            {
+              "desc": "Ovos (2), Pão integral (2 fatias), M. amendoim (10g), Banana (1/2)",
+              "macro": "~403 kcal, C41, P22"
+            }
+          ]
+        },
+        {
+          "meal": "Mid-morning snack",
+          "opts": [
+            {
+              "desc": "Iogurte proteico (150g), Banana (1), Mel (5g)",
+              "macro": "~208 kcal, C38, P16"
+            },
+            {
+              "desc": "Pão (2 fatias), Doce morango (20g), Café",
+              "macro": "~209 kcal, C42, P6"
+            },
+            {
+              "desc": "Bagel (1), Mel (5g)",
+              "macro": "~245 kcal, C49, P9"
+            }
+          ]
+        },
+        {
+          "meal": "Lunch",
+          "opts": [
+            {
+              "desc": "Peito de frango (180g), Arroz cozido (200g), Brócolos/legumes (200g), Azeite (10g)",
+              "macro": "~638 kcal, C73, P52"
+            },
+            {
+              "desc": "Massa cozida (170g), Atum (1 lata, 120g), Tomate (100g), Azeite (10g), Salada",
+              "macro": "~516 kcal, C58, P42"
+            },
+            {
+              "desc": "Peito de frango (160g), Batata-doce (200g), Espinafres/salada (150g), Azeite (10g)",
+              "macro": "~495 kcal, C47, P45"
+            }
+          ]
+        },
+        {
+          "meal": "Afternoon snack",
+          "opts": [
+            {
+              "desc": "Whey (30g), Leite (200ml), Maçã (1)",
+              "macro": "~286 kcal, C33, P31"
+            },
+            {
+              "desc": "Skyr (170g), Frutos vermelhos (80g), Amêndoas (10g)",
+              "macro": "~207 kcal, C19, P22"
+            },
+            {
+              "desc": "Atum (1 lata, 120g), Tortitas de milho (2), Tomate (100g)",
+              "macro": "~226 kcal, C18, P34"
+            }
+          ]
+        },
+        {
+          "meal": "Dinner",
+          "opts": [
+            {
+              "desc": "Salmão (150g), Arroz cozido (150g), Espinafres/salada (150g), Azeite (5g)",
+              "macro": "~590 kcal, C49, P38"
+            },
+            {
+              "desc": "Peito de frango (180g), Brócolos (200g), Massa cozida (140g), Azeite (5g)",
+              "macro": "~538 kcal, C56, P54"
+            },
+            {
+              "desc": "Peito de frango (180g), Batata-doce (180g), Salada grande, Azeite (5g)",
+              "macro": "~457 kcal, C43, P49"
+            }
+          ]
+        }
+      ]
+    },
+    "HARD": {
+      "label": "Hard day (Tue, Thu turbo)",
+      "target": "~2530 kcal, carbs 357g, protein 151g, fat 58g",
+      "when": "Hard intervals. Carbs concentrated around the session; whey in the recovery window.",
+      "onbike": null,
+      "hdr": "#ff9d3c",
+      "meals": [
+        {
+          "meal": "Breakfast",
+          "opts": [
+            {
+              "desc": "Aveia (60g), Leite (250ml), Whey (20g), Banana (1), Frutos vermelhos (60g), Mel (10g)",
+              "macro": "~594 kcal, C96, P34"
+            },
+            {
+              "desc": "Corn Flakes (50g), Skyr (150g), Banana (1), Mel (15g), Café",
+              "macro": "~436 kcal, C88, P21"
+            },
+            {
+              "desc": "Ovos (2), Pão integral (2 fatias), M. amendoim (10g), Banana (1), Café",
+              "macro": "~457 kcal, C55, P23"
+            }
+          ]
+        },
+        {
+          "meal": "Pre-ride snack",
+          "opts": [
+            {
+              "desc": "Tortitas de arroz (3), Mel (15g), Banana (1)",
+              "macro": "~257 kcal, C62, P4"
+            },
+            {
+              "desc": "Bagel (1), Mel (15g), Café",
+              "macro": "~275 kcal, C57, P9"
+            },
+            {
+              "desc": "Iogurte proteico (1, 150g), Banana (1), Mel (10g)",
+              "macro": "~223 kcal, C42, P16"
+            }
+          ]
+        },
+        {
+          "meal": "Lunch (recovery)",
+          "opts": [
+            {
+              "desc": "Arroz cozido (240g), Peito de frango (180g), Brócolos/espinafres, Azeite (10g), Maçã (1)",
+              "macro": "~753 kcal, C102, P52"
+            },
+            {
+              "desc": "Massa cozida (220g), Atum (1 lata, 120g), Tomate (100g), Azeite (10g), Azeitonas (20g), Banana (1)",
+              "macro": "~705 kcal, C99, P45"
+            },
+            {
+              "desc": "Batata-doce (250g), Peito de frango (150g), Lentilhas/grão coz. (120g), Salada + espinafres, Azeite (5g)",
+              "macro": "~611 kcal, C80, P53"
+            }
+          ]
+        },
+        {
+          "meal": "Afternoon snack",
+          "opts": [
+            {
+              "desc": "Skyr/iogurte proteico (170g), Frutos vermelhos (80g), Granola (30g)",
+              "macro": "~282 kcal, C36, P22"
+            },
+            {
+              "desc": "Iogurte grego 0% (170g), Maçã (1), Amêndoas (15g), Mel (10g)",
+              "macro": "~299 kcal, C39, P21"
+            },
+            {
+              "desc": "Whey (30g), Leite (250ml), Banana (1)",
+              "macro": "~338 kcal, C42, P34"
+            }
+          ]
+        },
+        {
+          "meal": "Dinner",
+          "opts": [
+            {
+              "desc": "Salmão (150g), Arroz cozido (190g), Espinafres/salada, Azeite (5g)",
+              "macro": "~643 kcal, C61, P39"
+            },
+            {
+              "desc": "Peito de frango (180g), Massa cozida (170g), Brócolos (150g), Tomate (100g), Azeite (5g)",
+              "macro": "~584 kcal, C65, P55"
+            },
+            {
+              "desc": "Hambúrguer (150g), Pão hamb. (1), Alface+tomate, Arroz cozido (110g)",
+              "macro": "~698 kcal, C65, P37"
+            }
+          ]
+        }
+      ]
+    },
+    "BIG": {
+      "label": "Long / Big day (Sunday + tests)",
+      "target": "~3500-4000+ kcal (calibrate to ride length), carbs to the top, protein ~150g",
+      "when": "Long/hard ride. Carbs to the top, fuel hard on the bike, big recovery after.",
+      "onbike": "60-90 g carb/h: 2x 30g bars - OR 1x 45g gel + 30g bar - OR 2x 45g gels. Plus 500-1000 mg sodium/h and 500-750 ml/h in heat. Eat every 20-30 min.",
+      "hdr": "#ff5d5d",
+      "meals": [
+        {
+          "meal": "Breakfast - pre-ride",
+          "opts": [
+            {
+              "desc": "Aveia (80g), Leite (300ml), Whey (20g), Banana (1), Mel (20g)",
+              "macro": "~696 kcal, C113, P38"
+            },
+            {
+              "desc": "Bagel (2), Doce morango (30g), Mel (15g), Banana (1)",
+              "macro": "~686 kcal, C149, P19"
+            },
+            {
+              "desc": "Pão (4 fatias), Mel (20g), Doce (20g), Iogurte proteico (170g), Banana (1)",
+              "macro": "~632 kcal, C122, P29"
+            }
+          ]
+        },
+        {
+          "meal": "Top-up before - optional (~30 min)",
+          "opts": [
+            {
+              "desc": "Banana (1) + cafe",
+              "macro": "~110 kcal, C27, P1"
+            },
+            {
+              "desc": "Tortitas de arroz (2) + mel (10g)",
+              "macro": "~150 kcal, C36, P2"
+            },
+            {
+              "desc": "Gel (45g) + agua, ~30 min antes",
+              "macro": "~170 kcal, C45, P0"
+            }
+          ]
+        },
+        {
+          "meal": "Lunch (recovery)",
+          "opts": [
+            {
+              "desc": "Arroz cozido (350g), Peito de frango (180g), Legumes (200g), Azeite (10g), Banana (1)",
+              "macro": "~957 kcal, C146, P57"
+            },
+            {
+              "desc": "Massa cozida (320g), Atum (1,5 lata, 180g), Tomate (100g), Azeite (10g), Pão (1 fatia)",
+              "macro": "~875 kcal, C115, P66"
+            },
+            {
+              "desc": "Batata-doce (350g), Peito de frango (150g), Grão coz. (120g), Salada/espinafres, Azeite (10g)",
+              "macro": "~808 kcal, C110, P56"
+            }
+          ]
+        },
+        {
+          "meal": "Afternoon snack",
+          "opts": [
+            {
+              "desc": "Skyr/iog. proteico (170g), Frutos vermelhos (80g), Granola (40g), Mel (10g)",
+              "macro": "~358 kcal, C51, P23"
+            },
+            {
+              "desc": "Pão (2 fatias), Doce (25g), Iogurte grego (170g), Banana (1)",
+              "macro": "~429 kcal, C79, P24"
+            },
+            {
+              "desc": "Whey (30g), Leite (250ml), Tortitas de arroz (2), Mel (10g)",
+              "macro": "~332 kcal, C37, P34"
+            }
+          ]
+        },
+        {
+          "meal": "Dinner",
+          "opts": [
+            {
+              "desc": "Salmão (150g), Arroz cozido (250g), Espinafres/salada (150g), Azeite (5g)",
+              "macro": "~723 kcal, C79, P41"
+            },
+            {
+              "desc": "Peito de frango (180g), Massa cozida (220g), Brócolos (150g), Azeite (5g)",
+              "macro": "~641 kcal, C76, P57"
+            },
+            {
+              "desc": "Peito de frango (180g), Batata-doce (250g), Lentilhas (120g), Salada, Azeite (5g)",
+              "macro": "~672 kcal, C86, P60"
+            }
+          ]
+        },
+        {
+          "meal": "Supper - optional (casein)",
+          "opts": [
+            {
+              "desc": "Iogurte grego (200g), Mel (10g)",
+              "macro": "~148 kcal, C15, P20"
+            }
+          ]
+        }
+      ]
+    },
+    "TRAVEL": {
+      "label": "Travel / Off day",
+      "target": "",
+      "when": "",
+      "onbike": null,
+      "hdr": "#6b7685",
+      "travel": "Travel / off day: no structured fuelling needed. Eat to appetite, keep protein up (~140 g - easy wins: yogurt, eggs, chicken/fish, a shake if travelling), favour whole foods, hydrate, and enjoy it. A short walk or some mobility is plenty. Don't try to diet hard on a rest/travel day - just don't over-do treats.",
+      "meals": []
+    }
+  },
+  "supplements": {
+    "core": [
+      "Creatine 3–5 g — any time, every day",
+      "Whey — top up toward ~150 g protein/day",
+      "Vitamin D3 1,000–2,000 IU",
+      "Omega-3 (EPA+DHA) 1–2 g"
+    ],
+    "notes": "Usa produtos com certificacao anti-doping (Informed Sport). Guia geral, nao e conselho medico - confirma com o teu medico, especialmente por causa do joelho."
+  },
+  "principles": [
+    "Target weight ~73-74 kg by the goal week, losing slowly (~0.15-0.25 kg/week). Fitness beats the scale.",
+    "Carbs follow the work: rest ~2 g/kg, endurance ~3-4 g/kg, hard ~5 g/kg, long/race ~6-8 g/kg + on-bike fuel.",
+    "Protein every meal (~30-45 g). Aim ~145-155 g/day - the single biggest lever for recovery here.",
+    "Never under-fuel Tue/Thu/Sat/Sun - low energy on key days costs power and is how you lose the plot.",
+    "Hydration: with gym 08:30 then turbo ~11:30, start drinking on waking; 500-750 ml/h on the bike + electrolytes when hot."
+  ],
+  "dietnotes": [
+    "On the bike for hard/long days, fuelling beats willpower: under-fuelling Tue/Thu/Sat/Sun is the fastest way to flat legs.",
+    "Post-key-session: get ~30-40 g protein + carbs within ~60 min (the recovery lunch/snack does this).",
+    "Oily fish 2x/week (omega-3) + enough protein support the knee and adaptation.",
+    "Alcohol blunts recovery and sleep - keep it minimal, especially the night before key days.",
+    "Weigh 1x/week, same morning, fasted, after the toilet. If weekly power is dropping, ease the deficit - eat a bit more on easy days."
   ]
 }
