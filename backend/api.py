@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from backend.apply import ApplyError, apply_for_today, preview_apply_for_today
 from backend.auth import require_app_token, require_ingest_token
+from backend.devices import save_device_token
 from backend.schemas import DailyCoachReport
 from backend.feedback import (
     FeedbackEntry,
@@ -170,7 +171,32 @@ def ingest_report(
     Protected by INGEST_TOKEN, not APP_TOKEN - see auth.py for why.
     """
     saved_path = save_daily_report(report)
+
+    try:
+        from backend.push import send_push_to_all_devices
+        send_push_to_all_devices(
+            title=f"Daily Coach — {report.status}",
+            body=report.title or "O relatório de hoje está pronto.",
+        )
+    except Exception as e:
+        print(f"Aviso: falha ao enviar push notification: {e}")
+
     return {"status": "saved", "date": report.date.isoformat(), "path": str(saved_path)}
+
+
+class DeviceRegisterRequest(BaseModel):
+    token: str
+    platform: str = "android"
+
+
+@app.post("/api/v1/devices/register")
+def register_device(
+    body: DeviceRegisterRequest,
+    _: None = Depends(require_app_token),
+):
+    """Called by the app once it has an FCM token, so push notifications know where to send."""
+    save_device_token(body.token, body.platform)
+    return {"status": "registered"}
 
 
 @app.get("/api/v1/reports/today/apply/preview")

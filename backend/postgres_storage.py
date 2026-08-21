@@ -122,3 +122,33 @@ def list_feedback_db() -> list[dict]:
     finally:
         conn.close()
     return [r[0] for r in rows]
+
+
+def save_device_token_db(token: str, platform: str) -> None:
+    conn = get_connection()
+    try:
+        ensure_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into device_tokens (token, platform)
+                values (%s, %s)
+                on conflict (token) do update set platform = excluded.platform;
+                """,
+                (token, platform),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_device_tokens_db() -> list[str]:
+    conn = get_connection()
+    try:
+        ensure_schema(conn)
+        with conn.cursor() as cur:
+            cur.execute("select token from device_tokens;")
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    return [r[0] for r in rows]

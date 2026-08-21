@@ -53,4 +53,13 @@ def ensure_schema(conn) -> None:
         cur.execute(
             "create index if not exists idx_feedback_entries_date on feedback_entries (feedback_date);"
         )
+        cur.execute(
+            """
+            create table if not exists device_tokens (
+                token text primary key,
+                platform text not null,
+                created_at timestamptz not null default now()
+            );
+            """
+        )
     conn.commit()

@@ -6,3 +6,4 @@ pydantic>=2.0.0
 fastapi
 uvicorn
 psycopg2-binary
+firebase-admin

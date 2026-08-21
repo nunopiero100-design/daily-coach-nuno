@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "967681319795",
+    "project_id": "daily-coach-82041",
+    "storage_bucket": "daily-coach-82041.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:967681319795:android:f4fc0e0e6984a16d3a1b06",
+        "android_client_info": {
+          "package_name": "com.nuno.dailycoach"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvnmY2H51ZDdby7uUKOx--dcb2M6h7qb0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

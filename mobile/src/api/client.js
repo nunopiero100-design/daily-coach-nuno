@@ -62,6 +62,10 @@ async function request(path, { method = 'GET', body } = {}) {
   return res.json();
 }
 
+export function registerDeviceToken(token, platform = 'android') {
+  return request('/api/v1/devices/register', { method: 'POST', body: { token, platform } });
+}
+
 export function runNow() {
   return request('/api/v1/reports/run-now', { method: 'POST' });
 }

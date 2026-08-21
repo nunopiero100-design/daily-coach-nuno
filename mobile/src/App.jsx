@@ -4,6 +4,7 @@ import GymScreen from './screens/GymScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { getTodayReport, runNow, ApiError } from './api/client';
+import { initPushNotifications } from './api/push';
 
 export default function App() {
   const [tab, setTab] = useState('today');
@@ -28,6 +29,7 @@ export default function App() {
   }, []);
 
   useEffect(() => { loadReport(); }, [loadReport]);
+  useEffect(() => { initPushNotifications(); }, []);
 
   // Reload = trigger a fresh Daily Coach run on GitHub Actions (pulls latest
   // Intervals.icu/wellness data, not just re-reads what's already stored).
