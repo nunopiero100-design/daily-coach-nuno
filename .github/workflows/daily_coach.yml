@@ -2,13 +2,13 @@ name: Daily Coach Agent
 
 on:
   schedule:
-    # 06:00 Portugal time (WEST, UTC+1) in August -> 05:00 UTC.
-    # NOTE: this is a fixed UTC time - when Portugal switches back to WET
-    # (UTC+0) in late October, this will effectively run at 07:00 local
-    # instead of 06:00, until adjusted here. GitHub also doesn't guarantee
-    # the exact minute for scheduled runs (can be a few minutes late during
-    # high load).
-    - cron: "0 5 * * *"
+    # 08:00 Portugal time (WEST, UTC+1) in August -> 07:00 UTC.
+    # Moved later than the original 06:00 so HRV/sleep/RHR have time to sync
+    # from the watch before the run.
+    # NOTE: fixed UTC time - when Portugal switches back to WET (UTC+0) in
+    # late October, this will effectively run at 09:00 local instead of
+    # 08:00, until adjusted here.
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
       apply:
