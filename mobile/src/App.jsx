@@ -5,6 +5,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { getTodayReport, runNow, ApiError } from './api/client';
 import { initPushNotifications } from './api/push';
+import { IconRefresh, IconHome, IconDumbbell, IconClock, IconSettingsGear } from './components/Icons';
 
 export default function App() {
   const [tab, setTab] = useState('today');
@@ -56,12 +57,12 @@ export default function App() {
       <div className="topbar">
         <div className="brand">DAILY<span className="dot">·</span>COACH</div>
         <button
-          className="icon-btn"
+          className={`refresh-btn ${runState === 'running' ? 'spin' : ''}`}
           onClick={handleRunNow}
           disabled={runState === 'running'}
           title="Pedir uma atualização a partir do Intervals.icu"
         >
-          {runState === 'running' ? '…' : '⟳ Atualizar'}
+          <IconRefresh size={17} />
         </button>
       </div>
 
@@ -99,10 +100,18 @@ export default function App() {
       </div>
 
       <div className="tabbar">
-        <div className={`tab ${tab === 'today' ? 'on' : ''}`} onClick={() => setTab('today')}>Hoje</div>
-        <div className={`tab ${tab === 'gym' ? 'on' : ''}`} onClick={() => setTab('gym')}>Gym</div>
-        <div className={`tab ${tab === 'history' ? 'on' : ''}`} onClick={() => setTab('history')}>Histórico</div>
-        <div className={`tab ${tab === 'settings' ? 'on' : ''}`} onClick={() => setTab('settings')}>Settings</div>
+        <div className={`tab ${tab === 'today' ? 'on' : ''}`} onClick={() => setTab('today')}>
+          <IconHome size={19} />Hoje
+        </div>
+        <div className={`tab ${tab === 'gym' ? 'on' : ''}`} onClick={() => setTab('gym')}>
+          <IconDumbbell size={19} />Gym
+        </div>
+        <div className={`tab ${tab === 'history' ? 'on' : ''}`} onClick={() => setTab('history')}>
+          <IconClock size={19} />Histórico
+        </div>
+        <div className={`tab ${tab === 'settings' ? 'on' : ''}`} onClick={() => setTab('settings')}>
+          <IconSettingsGear size={19} />Settings
+        </div>
       </div>
     </div>
   );

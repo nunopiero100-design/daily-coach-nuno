@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { listReports, ApiError } from '../api/client';
 import StatusBadge from '../components/StatusBadge';
-
-const STATUS_COLOR = { GREEN: '#4fd67a', YELLOW: '#f0c14b', RED: '#f0574b', INCOMPLETE: '#8b96a3' };
+import { IconClock } from '../components/Icons';
+import { STATUS_COLORS } from '../statusColors';
 
 function fmtDate(iso) {
   const [, m, d] = iso.split('-');
@@ -34,9 +34,20 @@ function FormSparkline({ reports }) {
       <line x1={pad} y1={zeroY} x2={w - pad} y2={zeroY} stroke="var(--card-border)" strokeWidth="1" strokeDasharray="3,3" />
       <path d={path} fill="none" stroke="var(--lime)" strokeWidth="2" />
       {points.map((r, i) => (
-        <circle key={i} cx={x(i)} cy={y(r.readiness.form)} r="3" fill={STATUS_COLOR[r.status] || 'var(--lime)'} />
+        <circle key={i} cx={x(i)} cy={y(r.readiness.form)} r="3" fill={STATUS_COLORS[r.status] || 'var(--lime)'} />
       ))}
     </svg>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div>
+      <div className="skeleton" style={{ height: 130, marginBottom: 14 }} />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div className="skeleton" key={i} style={{ height: 64, marginBottom: 14 }} />
+      ))}
+    </div>
   );
 }
 
@@ -61,14 +72,14 @@ export default function HistoryScreen() {
     load();
   }, []);
 
-  if (loading) return <div className="center-msg">A carregar…</div>;
+  if (loading) return <LoadingSkeleton />;
   if (error) return <div className="center-msg">{error}</div>;
   if (!reports || reports.length === 0) return <div className="center-msg">Sem histórico ainda.</div>;
 
   return (
     <div>
       <div className="card lead">
-        <div className="sub">HISTÓRICO</div>
+        <div className="section-label" style={{ margin: '0 0 8px' }}><IconClock size={13} />HISTÓRICO</div>
         <div className="h1">Últimos {reports.length} dias</div>
         <div className="sub" style={{ marginBottom: 8 }}>Form ao longo do tempo</div>
         <FormSparkline reports={reports} />

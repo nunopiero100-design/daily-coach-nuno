@@ -1,8 +1,10 @@
 :root {
   --bg: #0b0d10;
   --card: #12151a;
+  --card-2: #171b21;
   --card-border: #1e232b;
   --lime: #c6f24e;
+  --accent2: #8b7cff;
   --text: #eef2f5;
   --text-dim: #8b96a3;
   --green: #4fd67a;
@@ -60,6 +62,24 @@ body {
   font-size: 13px;
 }
 
+/* Circular icon-only refresh button - replaces the old text "⟳ Atualizar" /
+   "…" swap with a small spinning icon while a run is in flight. */
+.refresh-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  transition: border-color 0.15s, color 0.15s;
+}
+.refresh-btn:active { border-color: var(--lime); color: var(--lime); }
+.refresh-btn.spin svg { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 .content {
   flex: 1;
   padding: 8px 16px 32px;
@@ -102,8 +122,105 @@ body {
 .kv .v { font-weight: 600; }
 
 .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-.action-line { font-size: 14px; line-height: 1.4; padding-left: 14px; position: relative; }
-.action-line::before { content: '→'; position: absolute; left: 0; color: var(--lime); }
+
+/* Decision action lines - now carry a small leading icon (arrow for the
+   primary plan, utensils for fueling, etc.) instead of a bare "→" glyph. */
+.action-line { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; line-height: 1.4; }
+.action-line svg { flex-shrink: 0; margin-top: 2px; color: var(--lime); }
+.action-line.dim { color: var(--text-dim); font-size: 13px; }
+.action-line.dim svg { color: var(--text-dim); }
+
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  margin: 4px 2px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Small pill teaser for a not-yet-built season/goal feature - unused until
+   there's a real countdown to show, kept here so it's ready when there is. */
+.goal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(139,124,255,0.14);
+  color: var(--accent2);
+  border: 1px solid rgba(139,124,255,0.3);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px 5px 8px;
+  margin-bottom: 16px;
+  letter-spacing: 0.02em;
+}
+
+/* HERO - the status ring + headline at the top of Hoje. */
+.hero {
+  position: relative;
+  border-radius: 22px;
+  padding: 22px 18px;
+  margin-bottom: 14px;
+  background: var(--card-2);
+  border: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+}
+.ring-wrap { position: relative; flex-shrink: 0; }
+.ring-wrap svg { display: block; }
+.ring-bg { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 9; }
+.ring-fg { fill: none; stroke-width: 9; stroke-linecap: round; }
+.ring-label {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transform: none;
+}
+.ring-label .word { font-size: 12.5px; font-weight: 800; letter-spacing: 0.03em; text-align: center; }
+.ring-label .sub { font-size: 9.5px; color: var(--text-dim); margin-top: 1px; }
+
+.hero-text { position: relative; z-index: 1; min-width: 0; }
+.hero-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+.hero-title { font-size: 19px; font-weight: 800; line-height: 1.2; margin-bottom: 4px; }
+.hero-sub { font-size: 12.5px; color: var(--text-dim); line-height: 1.4; }
+
+/* Condensed stat grid - replaces 5 stacked kv rows with 2 columns of tiles,
+   each with an icon, so the readiness numbers take half the vertical space
+   and the decision card below gets to be the visual centerpiece. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.stat-tile {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 12px 12px 11px;
+}
+.stat-tile .top-row { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; margin-bottom: 6px; }
+.stat-tile .val { font-size: 17px; font-weight: 800; font-family: var(--mono); }
+.stat-tile .val small { font-size: 11px; font-weight: 600; color: var(--text-dim); margin-left: 2px; }
+
+/* Decision card - tinted by today's status color and given more visual
+   weight than the other cards, since it's the one thing that matters most. */
+.decision-card {
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+  margin-bottom: 14px;
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--lime);
+}
+.decision-tag { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; color: var(--lime); text-transform: uppercase; margin-bottom: 6px; }
+.decision-headline { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.decision-card .action-line { margin-bottom: 8px; }
+.decision-card .action-line.fueling { margin-top: 8px; }
 
 .feedback-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
 .feedback-btn {
@@ -117,6 +234,25 @@ body {
 }
 .feedback-btn:active { border-color: var(--lime); color: var(--lime); }
 
+/* Feedback chips (Hoje's "não vai dar para seguir o plano?" options) - same
+   grid as feedback-btn, but with a leading icon and a clearer active state
+   so they read as distinct choices instead of identical muted pills. */
+.feedback-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 10px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.feedback-chip svg { color: var(--text-dim); flex-shrink: 0; }
+.feedback-chip.active { border-color: var(--lime); background: rgba(198,242,78,0.08); color: var(--lime); }
+.feedback-chip.active svg { color: var(--lime); }
+
 .tabbar {
   display: flex;
   border-top: 1px solid var(--card-border);
@@ -124,15 +260,31 @@ body {
 }
 .tab {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   text-align: center;
-  padding: 12px 0 calc(10px + env(safe-area-inset-bottom));
+  padding: 10px 0 calc(8px + env(safe-area-inset-bottom));
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 .tab.on { color: var(--lime); }
 
 .center-msg { text-align: center; color: var(--text-dim); padding: 60px 20px; font-size: 14px; }
+
+/* Loading skeleton - a soft pulse instead of literal "A carregar…" text. */
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(100deg, var(--card) 30%, var(--card-2) 50%, var(--card) 70%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 input[type=text], input[type=password] {
   width: 100%;
@@ -147,13 +299,18 @@ input[type=text], input[type=password] {
 label { font-size: 12px; color: var(--text-dim); display: block; margin-bottom: 6px; }
 .primary-btn {
   width: 100%;
-  background: var(--lime);
+  background: linear-gradient(135deg, #d6ff6e, var(--lime));
   color: #0b0d10;
   border: none;
   border-radius: 10px;
   padding: 13px;
   font-weight: 700;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 10px 22px -10px rgba(198,242,78,0.5);
 }
 
 details summary {

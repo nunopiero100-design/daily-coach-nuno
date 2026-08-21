@@ -1,13 +1,20 @@
 import { useState } from 'react';
 import { sendFeedback, getApplyPreview, applyToday, ApiError } from '../api/client';
-import StatusBadge from '../components/StatusBadge';
+import StatusRing from '../components/StatusRing';
+import StatTile from '../components/StatTile';
+import { statusColor, hexToRgba } from '../statusColors';
+import {
+  IconMoon, IconHeart, IconActivity, IconTrendingUp, IconScale,
+  IconArrowRight, IconUtensils, IconClock, IconCloudRain, IconVirus,
+  IconBandage, IconBike,
+} from '../components/Icons';
 
 const FEEDBACK_OPTIONS = [
-  { type: 'NO_TIME', label: 'Sem tempo' },
-  { type: 'RAIN_INDOOR', label: 'Chuva / indoor' },
-  { type: 'SICK', label: 'Doente' },
-  { type: 'INJURED', label: 'Lesão' },
-  { type: 'NO_BIKE_WEEK', label: 'No bike week' },
+  { type: 'NO_TIME', label: 'Sem tempo', icon: <IconClock /> },
+  { type: 'RAIN_INDOOR', label: 'Chuva / indoor', icon: <IconCloudRain /> },
+  { type: 'SICK', label: 'Doente', icon: <IconVirus /> },
+  { type: 'INJURED', label: 'Lesão', icon: <IconBandage /> },
+  { type: 'NO_BIKE_WEEK', label: 'No bike week', icon: <IconBike /> },
 ];
 
 // The backend only allows applying a replacement on YELLOW/RED days.
@@ -44,6 +51,20 @@ function groupActions(raw) {
     else primary.push(line);
   }
   return { primary, alternatives, fueling };
+}
+
+function LoadingSkeleton() {
+  return (
+    <div>
+      <div className="skeleton" style={{ height: 96, marginBottom: 14 }} />
+      <div className="stat-grid">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div className="skeleton" key={i} style={{ height: 60 }} />
+        ))}
+      </div>
+      <div className="skeleton" style={{ height: 160, marginTop: 14 }} />
+    </div>
+  );
 }
 
 export default function TodayScreen({ report, loading, error, reload }) {
@@ -87,7 +108,7 @@ export default function TodayScreen({ report, loading, error, reload }) {
     }
   }
 
-  if (loading) return <div className="center-msg">A carregar…</div>;
+  if (loading) return <LoadingSkeleton />;
 
   if (error) {
     return (
@@ -116,12 +137,17 @@ export default function TodayScreen({ report, loading, error, reload }) {
     .map((l) => l.replace(/^-\s*/, '').trim())
     .filter((l) => l && !actionLineSet.has(l));
 
+  const color = statusColor(report.status);
+
   return (
     <div>
-      <div className="card lead">
-        <StatusBadge status={report.status} />
-        <div className="h1">{report.title || 'Sem título'}</div>
-        {report.summary && <div className="sub">{report.summary}</div>}
+      <div className="hero">
+        <StatusRing status={report.status} sublabel={rd.form != null ? `form ${fmtNum(rd.form)}` : null} />
+        <div className="hero-text">
+          <div className="hero-eyebrow">Hoje</div>
+          <div className="hero-title">{report.title || 'Sem título'}</div>
+          {report.summary && <div className="hero-sub">{report.summary}</div>}
+        </div>
       </div>
 
       {pw?.name ? (
@@ -135,32 +161,32 @@ export default function TodayScreen({ report, loading, error, reload }) {
         <div className="card"><div className="sub">Sem treino planeado hoje.</div></div>
       )}
 
-      <div className="card">
-        <div className="sub" style={{ marginBottom: 8 }}>READINESS</div>
-        <div className="kv"><span className="k">Sono</span><span className="v">{fmtMin(Math.round((rd.sleep_hours || 0) * 60))}</span></div>
-        <div className="kv"><span className="k">HRV</span><span className="v">{rd.hrv ?? 'n/d'}</span></div>
-        <div className="kv"><span className="k">Resting HR</span><span className="v">{rd.resting_hr ?? 'n/d'} bpm</span></div>
-        <div className="kv"><span className="k">Fitness / Fatigue</span><span className="v">{fmtNum(rd.fitness_ctl)} / {fmtNum(rd.fatigue_atl)}</span></div>
-        <div className="kv"><span className="k">Form</span><span className="v">{fmtNum(rd.form)}</span></div>
+      <div className="section-label">Readiness &amp; peso</div>
+      <div className="stat-grid">
+        <StatTile icon={<IconMoon />} label="Sono" value={fmtMin(Math.round((rd.sleep_hours || 0) * 60))} />
+        <StatTile icon={<IconHeart />} label="HRV" value={rd.hrv ?? 'n/d'} />
+        <StatTile icon={<IconActivity />} label="Resting HR" value={rd.resting_hr ?? 'n/d'} unit={rd.resting_hr != null ? 'bpm' : null} />
+        <StatTile icon={<IconTrendingUp />} label="Fitness / Fatigue" value={`${fmtNum(rd.fitness_ctl)}/${fmtNum(rd.fatigue_atl)}`} />
+        <StatTile icon={<IconScale />} label="Peso hoje" value={fmtNum(w.current_kg, 1)} unit="kg" />
+        <StatTile icon={<IconScale />} label="Objetivo" value={fmtNum(w.target_kg, 1)} unit="kg" />
       </div>
 
-      <div className="card">
-        <div className="sub" style={{ marginBottom: 8 }}>PESO</div>
-        <div className="kv"><span className="k">Hoje</span><span className="v">{fmtNum(w.current_kg, 1)} kg</span></div>
-        <div className="kv"><span className="k">Média 7d</span><span className="v">{fmtNum(w.avg_7d_kg, 1)} kg</span></div>
-        <div className="kv"><span className="k">Objetivo</span><span className="v">{fmtNum(w.target_kg, 1)} kg</span></div>
-      </div>
-
-      <div className="card lead">
-        <div className="sub" style={{ marginBottom: 8 }}>DECISÃO — {rec.action || 'n/d'}</div>
-        <div className="sub" style={{ color: 'var(--text)', fontWeight: 600, marginBottom: 8 }}>{rec.headline}</div>
+      <div className="decision-card" style={{ borderLeftColor: color, background: `linear-gradient(160deg, ${hexToRgba(color, 0.12)}, transparent 60%), var(--card)` }}>
+        <div className="decision-tag" style={{ color }}>Decisão — {rec.action || 'n/d'}</div>
+        <div className="decision-headline">{rec.headline}</div>
 
         {grouped.primary.map((line, i) => (
-          <div className="action-line" key={`p${i}`} style={{ marginBottom: 6, fontSize: 15 }}>{line}</div>
+          <div className="action-line" key={`p${i}`}>
+            <IconArrowRight size={15} style={{ color }} />
+            <span>{line}</span>
+          </div>
         ))}
 
         {grouped.fueling.map((line, i) => (
-          <div className="action-line" key={`f${i}`} style={{ marginBottom: 6, marginTop: 8, color: 'var(--text-dim)' }}>{line}</div>
+          <div className="action-line dim fueling" key={`f${i}`}>
+            <IconUtensils size={14} />
+            <span>{line}</span>
+          </div>
         ))}
 
         {grouped.alternatives.length > 0 && (
@@ -168,9 +194,12 @@ export default function TodayScreen({ report, loading, error, reload }) {
             <summary style={{ cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13 }}>
               Alternativas (menos tempo / indoor) <span className="chev">›</span>
             </summary>
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {grouped.alternatives.map((line, i) => (
-                <div className="action-line" key={`a${i}`} style={{ marginBottom: 6, fontSize: 13, color: 'var(--text-dim)' }}>{line}</div>
+                <div className="action-line dim" key={`a${i}`} style={{ fontSize: 13 }}>
+                  <IconArrowRight size={13} />
+                  <span>{line}</span>
+                </div>
               ))}
             </div>
           </details>
@@ -197,7 +226,10 @@ export default function TodayScreen({ report, loading, error, reload }) {
               <div className="kv"><span className="k">Carga da alternativa</span><span className="v">{preview.new_load} TSS</span></div>
               <div className="sub" style={{ marginTop: 8 }}>Vais ficar com os dois treinos hoje - apaga o que não quiseres diretamente no Intervals.icu.</div>
               <div style={{ height: 10 }} />
-              <button className="primary-btn" onClick={handleConfirmApply}>Criar em Intervals.icu</button>
+              <button className="primary-btn" onClick={handleConfirmApply}>
+                <IconArrowRight size={15} />
+                Criar em Intervals.icu
+              </button>
               <div style={{ height: 8 }} />
               <button className="icon-btn" style={{ width: '100%' }} onClick={() => setApplyState('idle')}>Cancelar</button>
             </>
@@ -217,22 +249,25 @@ export default function TodayScreen({ report, loading, error, reload }) {
         <div className="card">
           <div className="sub" style={{ marginBottom: 8 }}>MOTIVOS</div>
           {reasonsOnly.map((line, i) => (
-            <div key={i} className="action-line" style={{ marginBottom: 6 }}>{line}</div>
+            <div key={i} className="action-line" style={{ marginBottom: 6 }}>
+              <IconArrowRight size={14} />
+              <span>{line}</span>
+            </div>
           ))}
         </div>
       )}
 
       <div className="card">
-        <div className="sub" style={{ marginBottom: 4 }}>Não vai dar para seguir o plano?</div>
+        <div className="sub" style={{ marginBottom: 8 }}>Não vai dar para seguir o plano?</div>
         <div className="feedback-row">
           {FEEDBACK_OPTIONS.map((f) => (
             <button
               key={f.type}
-              className="feedback-btn"
+              className={`feedback-chip ${sentFeedback === f.type ? 'active' : ''}`}
               onClick={() => handleFeedback(f.type)}
-              style={sentFeedback === f.type ? { borderColor: 'var(--lime)', color: 'var(--lime)' } : undefined}
             >
-              {sentFeedback === f.type ? '✓ ' : ''}{f.label}
+              {f.icon}
+              <span>{sentFeedback === f.type ? '✓ ' : ''}{f.label}</span>
             </button>
           ))}
         </div>

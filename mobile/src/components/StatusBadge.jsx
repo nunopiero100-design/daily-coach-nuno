@@ -1,12 +1,7 @@
-const LABELS = {
-  GREEN: 'Verde',
-  YELLOW: 'Amarelo',
-  RED: 'Vermelho',
-  INCOMPLETE: 'Dados incompletos',
-};
+import { STATUS_LABELS } from '../statusColors';
 
 export default function StatusBadge({ status }) {
-  const label = LABELS[status] || status || 'n/d';
-  const cls = LABELS[status] ? status : 'INCOMPLETE';
+  const label = STATUS_LABELS[status] || status || 'n/d';
+  const cls = STATUS_LABELS[status] ? status : 'INCOMPLETE';
   return <span className={`status-badge ${cls}`}>{label}</span>;
 }

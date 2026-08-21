@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getSettings, saveSettings, healthCheck } from '../api/client';
+import { IconSettingsGear } from '../components/Icons';
 
 export default function SettingsScreen() {
   const [baseUrl, setBaseUrl] = useState('');
@@ -30,7 +31,7 @@ export default function SettingsScreen() {
   return (
     <div>
       <div className="card">
-        <div className="sub" style={{ marginBottom: 10 }}>LIGAÇÃO AO BACKEND</div>
+        <div className="section-label" style={{ margin: '0 0 10px' }}><IconSettingsGear size={13} />LIGAÇÃO AO BACKEND</div>
         <label>URL do backend (Render)</label>
         <input
           type="text"

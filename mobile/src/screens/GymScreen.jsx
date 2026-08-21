@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import gymData from '../mock/gymPlan.json';
+import { IconDumbbell, IconArrowRight } from '../components/Icons';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_LABELS_PT = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
@@ -21,7 +22,7 @@ export default function GymScreen({ report }) {
   return (
     <div>
       <div className="card lead">
-        <div className="sub">GYM</div>
+        <div className="section-label" style={{ margin: '0 0 4px' }}><IconDumbbell size={13} />GYM</div>
         <div className="h1">{hasSessionToday ? 'Hoje tens ginásio' : DAY_LABELS_PT[todayIdx]}</div>
         {!hasSessionToday && <div className="sub">Sem sessão de ginásio programada hoje.</div>}
       </div>
@@ -71,7 +72,10 @@ export default function GymScreen({ report }) {
       <div className="card">
         <div className="sub" style={{ marginBottom: 8 }}>EVITAR (JOELHO)</div>
         {gymData.strength.avoid.map((a, i) => (
-          <div key={i} className="action-line" style={{ marginBottom: 6 }}>{a}</div>
+          <div key={i} className="action-line" style={{ marginBottom: 6 }}>
+            <IconArrowRight size={14} />
+            <span>{a}</span>
+          </div>
         ))}
       </div>
     </div>
